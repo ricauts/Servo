@@ -1,0 +1,24 @@
+<svg width="1200" height="280" viewBox="0 0 1200 280" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="280" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1512"/>
+      <stop offset="1" stop-color="#10231B"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.4" r="0.75">
+      <stop stop-color="#12B76A" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#12B76A" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="280" fill="url(#bg)"/>
+  <rect width="1200" height="280" fill="url(#glow)"/>
+
+  <!-- grid texture -->
+  <g stroke="#1C3A2C" stroke-width="1" opacity="0.5">
+    <path d="M0 70h1200M0 140h1200M0 210h1200"/>
+    <path d="M150 0v280M350 0v280M550 0v280M750 0v280M950 0v280"/>
+  </g>
+
+  <text x="600" y="140" text-anchor="middle" font-family="Lato, 'Segoe UI', Arial, sans-serif" font-size="72" font-weight="900" letter-spacing="-2.5" fill="#F3FBF6">Servo<tspan fill="#12B76A">.</tspan></text>
+  <text x="600" y="185" text-anchor="middle" font-family="Lato, 'Segoe UI', Arial, sans-serif" font-size="17" fill="#9DB8A9">Open-source AI service desk — humans and AI agents working the same queue</text>
+  <text x="600" y="222" text-anchor="middle" font-family="'Roboto Mono', Consolas, monospace" font-size="12.5" letter-spacing="3" fill="#7FA893">TRIAGE · RESOLVE · APPROVE · QA · MEASURE</text>
+</svg>

@@ -1,0 +1,121 @@
+// Servo data model. SQLite does not support Prisma enums, so enum-like fields
+// are strings constrained by the union types in src/lib/types.ts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  role      String // ADMIN | AGENT | REQUESTER | AI_AGENT
+  aiKind    String? // TRIAGE | RESOLVER | QA (only when role = AI_AGENT)
+  color     String   @default("#165A56")
+  createdAt DateTime @default(now())
+
+  requestedTickets Ticket[]   @relation("requester")
+  assignedTickets  Ticket[]   @relation("assignee")
+  comments         Comment[]
+  decisions        Approval[] @relation("decider")
+}
+
+model Ticket {
+  id              String    @id @default(cuid())
+  number          Int       @unique
+  title           String
+  description     String
+  status          String    @default("OPEN") // OPEN | TRIAGED | IN_PROGRESS | WAITING_APPROVAL | RESOLVED | CLOSED
+  priority        String    @default("MEDIUM") // LOW | MEDIUM | HIGH | URGENT
+  category        String    @default("OTHER") // ACCESS | HARDWARE | SOFTWARE | DATABASE | DEVOPS | NETWORK | OTHER
+  requesterId     String
+  requester       User      @relation("requester", fields: [requesterId], references: [id])
+  assigneeId      String?
+  assignee        User?     @relation("assignee", fields: [assigneeId], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  firstResponseAt DateTime?
+  resolvedAt      DateTime?
+
+  comments  Comment[]
+  runs      AgentRun[]
+  approvals Approval[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  body      String
+  kind      String   @default("COMMENT") // COMMENT | SYSTEM
+  createdAt DateTime @default(now())
+}
+
+model AgentRun {
+  id           String    @id @default(cuid())
+  ticketId     String
+  ticket       Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  agentUserId  String // the AI_AGENT user executing this run
+  kind         String // TRIAGE | RESOLVE
+  status       String    @default("RUNNING") // RUNNING | WAITING_APPROVAL | COMPLETED | FAILED
+  conversation String    @default("[]") // JSON: provider message history, used to resume after approvals
+  summary      String?
+  error        String?
+  qaVerdict    String? // PASS | FAIL
+  qaNotes      String?
+  createdAt    DateTime  @default(now())
+  completedAt  DateTime?
+
+  steps     AgentStep[]
+  approvals Approval[]
+}
+
+model AgentStep {
+  id        String   @id @default(cuid())
+  runId     String
+  run       AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  index     Int
+  type      String // TEXT | TOOL_CALL | TOOL_RESULT | APPROVAL_REQUEST | QA_REVIEW | ERROR
+  toolName  String?
+  content   String // plain text, or JSON string for tool inputs/outputs
+  riskLevel String? // LOW | MEDIUM | HIGH
+  createdAt DateTime @default(now())
+}
+
+model Approval {
+  id          String    @id @default(cuid())
+  runId       String
+  run         AgentRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  ticketId    String
+  ticket      Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  toolName    String
+  toolInput   String // JSON
+  toolUseId   String // provider tool_use id, echoed back into the conversation on resume
+  riskLevel   String // LOW | MEDIUM | HIGH
+  status      String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  reason      String?
+  requestedAt DateTime  @default(now())
+  decidedAt   DateTime?
+  deciderId   String?
+  decider     User?     @relation("decider", fields: [deciderId], references: [id])
+}
+
+model ToolPolicy {
+  toolName         String  @id
+  description      String
+  riskLevel        String // LOW | MEDIUM | HIGH
+  enabled          Boolean @default(true)
+  requiresApproval Boolean @default(false)
+}
+
+model Setting {
+  key   String @id
+  value String
+}

@@ -1,0 +1,212 @@
+# Servo Architecture
+
+This document describes how Servo is built: the stack, the data model, the AI
+agent engine, the tool/approval policy system, and the provider abstraction.
+For the build contract that module authors follow, see
+[CONTRACT.md](CONTRACT.md).
+
+## Stack
+
+| Layer | Choice |
+|---|---|
+| Framework | Next.js 15 (App Router), React 19, server components by default |
+| Language | TypeScript (strict) |
+| Database | Prisma 6 + SQLite (app DB `prisma/dev.db`, sandbox ops DB `prisma/ops.db`) |
+| Styling | Tailwind CSS 3.4 with design tokens (no raw hex in markup) |
+| Validation | zod v4 |
+| AI SDK | `@anthropic-ai/sdk` (only used when a key is configured) |
+
+Pages are server-rendered; interactivity lives in small client islands that
+call the JSON API routes under `src/app/api/*` and refresh via
+`router.refresh()`.
+
+## Data model
+
+SQLite has no enums, so enum-like columns are strings constrained by the union
+types in `src/lib/types.ts` — that file is the single source of truth for
+values like `TicketStatus`, `Priority`, `RiskLevel`, and `RunStatus`.
+
+- **User** — humans (`ADMIN` / `AGENT` / `REQUESTER`) and AI agents
+  (`AI_AGENT` with `aiKind` = `TRIAGE` / `RESOLVER` / `QA`). AI agents are
+  ordinary users: they can be assignees and comment authors.
+- **Ticket** — number, title, description, status
+  (`OPEN → TRIAGED → IN_PROGRESS → WAITING_APPROVAL → RESOLVED → CLOSED`),
+  priority, category, requester, optional assignee, plus `firstResponseAt`
+  and `resolvedAt` timestamps that feed the KPIs.
+- **Comment** — `COMMENT` (a person or agent speaking) or `SYSTEM`
+  (triage rationale, QA flags, rejection notices).
+- **AgentRun** — one execution of an agent on a ticket (`TRIAGE` or
+  `RESOLVE`). Holds status, a summary, an optional error, QA verdict/notes,
+  and crucially the full provider **conversation as JSON** — that persisted
+  conversation is what makes pausing and resuming possible.
+- **AgentStep** — the ordered, human-readable trace of a run: `TEXT`,
+  `TOOL_CALL`, `TOOL_RESULT`, `APPROVAL_REQUEST`, `QA_REVIEW`, `ERROR`.
+  Rendered on the ticket timeline.
+- **Approval** — a pending/decided human decision on one tool call. Stores
+  the tool name, its JSON input, the provider `toolUseId` (echoed back into
+  the conversation on resume), risk level, decider, and reason.
+- **ToolPolicy** — per-tool risk level, enabled flag, and
+  `requiresApproval` flag. Editable at runtime from Settings.
+- **Setting** — key/value store for provider config
+  (`ai.provider`, `ai.apiKey`, `ai.baseUrl`, `ai.model`, `ai.autoTriage`,
+  `ai.qaEnabled`).
+
+A second SQLite database (`prisma/ops.db`) is the **sandbox ops database** the
+agent operates on: `devices`, `employees`, `employees_backup`,
+`software_licenses`, `campaign_tracking`. It stands in for the real systems a
+production deployment would integrate with.
+
+## The agent engine
+
+The engine lives in `src/lib/ai/` and exposes three entry points from
+`engine.ts`:
+
+- `runTriage(ticketId)` — one provider call; parses a JSON verdict
+  (category, priority, AI-or-human routing, rationale), updates the ticket,
+  posts a system comment.
+- `runResolver(ticketId)` — the tool-use loop described below.
+- `resumeAfterApproval(approvalId)` — continues a paused run after a human
+  decision.
+
+### Flow
+
+```mermaid
+sequenceDiagram
+    participant R as Requester
+    participant API as API routes
+    participant T as Triage agent
+    participant A as Resolver agent
+    participant P as Provider (anthropic/mock)
+    participant TL as Tools
+    participant H as Human (admin/agent)
+    participant Q as QA agent
+
+    R->>API: POST /api/tickets
+    API->>T: runTriage(ticketId)
+    T->>P: complete(triage prompt)
+    P-->>T: {category, priority, assignTo, rationale}
+    T->>API: ticket TRIAGED, assign AI resolver
+
+    API->>A: runResolver(ticketId)
+    loop until no tool calls (max 12 turns)
+        A->>P: complete(system, conversation, tools)
+        P-->>A: text + tool calls
+        alt tool requires approval
+            A->>H: create Approval (PENDING), run WAITING_APPROVAL
+            Note over A: conversation persisted, run paused
+            H->>API: POST /api/approvals/[id] (approve/reject)
+            API->>A: resumeAfterApproval(approvalId)
+            alt approved
+                A->>TL: execute tool
+                TL-->>A: tool_result
+            else rejected
+                A-->>A: tool_result with is_error (agent adapts)
+            end
+        else auto-approved tool
+            A->>TL: execute tool
+            TL-->>A: tool_result
+        end
+    end
+    A->>API: run COMPLETED, ticket RESOLVED
+    opt medium/high-risk tools ran and QA enabled
+        A->>Q: qaPrompt(run, ticket)
+        Q->>P: complete(QA review)
+        P-->>Q: {verdict, notes}
+        alt FAIL
+            Q->>API: reassign ticket to human + system comment
+        end
+    end
+```
+
+### The resolver loop in detail
+
+1. Load the ticket, AI settings, and the **enabled** tool policies. Build the
+   system prompt and the initial user message from the ticket.
+2. Set the ticket `IN_PROGRESS` (unless resuming).
+3. Loop, at most 12 iterations:
+   - Call `provider.complete(...)`; persist any text as a `TEXT` step.
+   - For each tool call: if the tool is unknown or disabled, feed back an
+     error `tool_result`. If its policy requires approval, create a PENDING
+     `Approval`, an `APPROVAL_REQUEST` step, set run and ticket to
+     `WAITING_APPROVAL`, persist the conversation, and **return** — the run
+     is now paused. Otherwise execute it and persist `TOOL_CALL` /
+     `TOOL_RESULT` steps.
+   - A turn with no tool calls ends the loop: run `COMPLETED` with the final
+     text as summary.
+4. The conversation JSON is persisted on every state change, so
+   `resumeAfterApproval` can reload it, append the tool result (real output
+   when approved, an `is_error` rejection message when rejected), and rejoin
+   the exact same loop.
+5. Any exception sets the run `FAILED` with an `ERROR` step — a run is never
+   left stuck in `RUNNING`.
+
+Rejections are informative, not fatal: the agent receives
+`"Rejected by <decider>: <reason>"` as an error tool result and is prompted to
+adapt (typically posting an explanatory comment and resolving with a note
+that human follow-up is needed) rather than retrying the same call.
+
+## Tool registry and risk/approval policy
+
+Ten tools are registered in `src/lib/ai/tools.ts`; their names match the
+seeded `ToolPolicy` rows exactly. Risk levels and approval flags below are the
+seeded defaults — all editable in Settings at runtime:
+
+| Tool | What it does | Risk | Requires approval |
+|---|---|---|---|
+| `query_ops_database` | Read-only SQL (SELECT/WITH only, single statement) against the sandbox ops DB | LOW | No |
+| `execute_ops_sql` | Mutating SQL (CREATE/INSERT/UPDATE/DELETE/DROP) against the sandbox ops DB | HIGH | **Yes** |
+| `get_device_info` | Device inventory lookup by asset tag (parameterized query) | LOW | No |
+| `reset_password` | Password reset + recovery link (simulated) | MEDIUM | No |
+| `github_create_repo` | Create a GitHub repository (simulated) | MEDIUM | No |
+| `github_open_pr` | Open a pull request (simulated) | MEDIUM | No |
+| `cloud_plan_deployment` | Generate an IaC deployment plan (simulated) | LOW | No |
+| `cloud_apply_deployment` | Apply a deployment plan (simulated) | HIGH | **Yes** |
+| `post_comment` | Post a public comment on the ticket | LOW | No |
+| `resolve_ticket` | Mark the ticket resolved with a note | LOW | No |
+
+Approval decisions are themselves permission-gated
+(`src/lib/permissions.ts`): admins can decide anything; agents can decide
+LOW and MEDIUM risk but **not HIGH**; requesters cannot decide approvals.
+
+## Provider abstraction
+
+`src/lib/ai/provider.ts` defines a minimal `ChatProvider` interface — one
+`complete()` method taking a system prompt, a message history in
+Anthropic-Messages shape (`ConversationMessage[]` from `src/lib/types.ts`),
+and tool specs, returning text plus zero or more tool calls.
+
+- **AnthropicProvider** wraps `@anthropic-ai/sdk` `messages.create` with the
+  configured model, key, and optional base URL.
+- **MockProvider** (`mock.ts`) is fully deterministic and offline. It derives
+  a plausible tool script from the ticket text via keyword matching
+  (password → `reset_password`, asset tags → `get_device_info`,
+  SQL/table language → the ops-DB tools, repo/deploy language → the
+  GitHub/cloud tools), always finishing with `post_comment` +
+  `resolve_ticket`. Because it reads the same conversation format, the whole
+  pause/resume/rejection machinery behaves identically with or without a key.
+
+Provider selection (`src/lib/ai/settings.ts`): the `ai.provider` setting picks
+anthropic or mock; if anthropic is selected but no key exists in either the
+environment (`ANTHROPIC_API_KEY`, which wins) or the Settings table, the
+engine falls back to mock so the app keeps working.
+
+## From POC to a real deployment
+
+The sandbox ops DB and the simulated tools are deliberate stand-ins. To take
+this architecture to production you would keep the engine, the policy layer,
+and the pause/resume protocol unchanged, and swap tool implementations:
+
+- `query_ops_database` / `execute_ops_sql` → connections to real
+  warehouses/CMDBs, with per-tool credentials and read replicas for the
+  read path.
+- `get_device_info` → your MDM/asset system's API.
+- `reset_password` → your identity provider (Entra ID, Okta, …).
+- `github_*` → the real GitHub API with a scoped app installation.
+- `cloud_*` → Terraform/Bicep pipelines or cloud provider APIs, where the
+  plan/apply split maps naturally onto the approval gate.
+
+Each tool's `execute()` is the only thing that changes — risk levels,
+approval gates, QA review, and the run trace all apply to real integrations
+exactly as they do to the simulations. You would also replace the demo
+cookie auth with SSO, encrypt stored secrets, and move from SQLite to a
+server database, per the security disclaimer in the README.

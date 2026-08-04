@@ -1,0 +1,157 @@
+import { Lock } from "lucide-react";
+import { db } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
+import { SETTING_KEYS, type RiskLevel } from "@/lib/types";
+import PageHeader from "@/components/shell/PageHeader";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import Avatar from "@/components/legacy/Avatar";
+import Badge from "@/components/legacy/Badge";
+import EmptyState from "@/components/legacy/EmptyState";
+import type { BadgeTone } from "@/lib/labels";
+import AiProviderForm, {
+  type AiSettingsView,
+} from "@/components/admin/AiProviderForm";
+import ToolPolicyTable, {
+  type ToolPolicyView,
+} from "@/components/admin/ToolPolicyTable";
+
+export const dynamic = "force-dynamic";
+
+const ROLE_TONE: Record<string, BadgeTone> = {
+  ADMIN: "brand",
+  AGENT: "good",
+  REQUESTER: "neutral",
+  AI_AGENT: "violet",
+};
+
+export default async function SettingsPage() {
+  const user = await getCurrentUser();
+
+  if (user.role !== "ADMIN") {
+    return (
+      <>
+        <PageHeader
+          title="Settings"
+          description="AI provider, tool permissions and team."
+        />
+        <div className="p-4 md:p-8">
+          <EmptyState
+            icon={Lock}
+            title="Admin access required"
+            hint="Settings can only be managed by administrators. Use the user switcher at the bottom of the sidebar to switch to an admin account."
+          />
+        </div>
+      </>
+    );
+  }
+
+  const [settingRows, toolPolicies, users] = await Promise.all([
+    db.setting.findMany(),
+    db.toolPolicy.findMany({ orderBy: { toolName: "asc" } }),
+    db.user.findMany({ orderBy: { createdAt: "asc" } }),
+  ]);
+
+  const settings = Object.fromEntries(settingRows.map((s) => [s.key, s.value]));
+  const envKey = Boolean(process.env.ANTHROPIC_API_KEY);
+  const dbKey = Boolean(settings[SETTING_KEYS.apiKey]);
+  const keySource: AiSettingsView["keySource"] = envKey
+    ? "env"
+    : dbKey
+      ? "db"
+      : "none";
+
+  const aiSettings: AiSettingsView = {
+    provider: settings[SETTING_KEYS.provider] ?? "mock",
+    baseUrl: settings[SETTING_KEYS.baseUrl] ?? "",
+    model: settings[SETTING_KEYS.model] ?? "claude-opus-5",
+    autoTriage: (settings[SETTING_KEYS.autoTriage] ?? "true") === "true",
+    qaEnabled: (settings[SETTING_KEYS.qaEnabled] ?? "true") === "true",
+    apiKeySet: envKey || dbKey,
+    keySource,
+  };
+
+  const policyViews: ToolPolicyView[] = toolPolicies.map((p) => ({
+    toolName: p.toolName,
+    description: p.description,
+    riskLevel: p.riskLevel as RiskLevel,
+    enabled: p.enabled,
+    requiresApproval: p.requiresApproval,
+  }));
+
+  return (
+    <>
+      <PageHeader
+        title="Settings"
+        description="Configure the AI provider (bring your own key), tool permissions and review your team."
+      />
+      <div className="max-w-4xl space-y-6 p-4 md:p-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>AI provider (BYOK)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AiProviderForm initial={aiSettings} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Tool permissions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ToolPolicyTable initialPolicies={policyViews} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Team</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 font-sans">
+            <ul className="flex flex-col">
+              {users.map((u) => (
+                <li
+                  key={u.id}
+                  className="flex items-center gap-3 rounded-md px-1 py-2"
+                >
+                  <Avatar
+                    name={u.name}
+                    color={u.color}
+                    size={28}
+                    isAi={u.role === "AI_AGENT"}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-foreground">
+                      {u.name}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {u.email}
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Badge tone={ROLE_TONE[u.role] ?? "neutral"}>
+                      {u.role.replace("_", " ")}
+                    </Badge>
+                    {u.role === "AI_AGENT" && u.aiKind && (
+                      <Badge tone="neutral">{u.aiKind}</Badge>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <Separator />
+            <p className="font-body text-sm text-muted-foreground">
+              Read-only in this POC — users are seeded for the demo.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    </>
+  );
+}

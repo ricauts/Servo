@@ -1,0 +1,94 @@
+// Central label + tone maps so every surface renders statuses identically.
+// Tones map to the Badge component's `tone` prop.
+
+import type {
+  ApprovalStatus,
+  Category,
+  Priority,
+  RiskLevel,
+  RunStatus,
+  TicketStatus,
+} from "@/lib/types";
+
+export type BadgeTone =
+  | "neutral"
+  | "brand"
+  | "good"
+  | "warn"
+  | "serious"
+  | "critical"
+  | "violet";
+
+export const STATUS_LABEL: Record<TicketStatus, string> = {
+  OPEN: "Open",
+  TRIAGED: "Triaged",
+  IN_PROGRESS: "In progress",
+  WAITING_APPROVAL: "Waiting approval",
+  RESOLVED: "Resolved",
+  CLOSED: "Closed",
+};
+
+export const STATUS_TONE: Record<TicketStatus, BadgeTone> = {
+  OPEN: "serious",
+  TRIAGED: "brand",
+  IN_PROGRESS: "violet",
+  WAITING_APPROVAL: "warn",
+  RESOLVED: "good",
+  CLOSED: "neutral",
+};
+
+export const PRIORITY_LABEL: Record<Priority, string> = {
+  LOW: "Low",
+  MEDIUM: "Medium",
+  HIGH: "High",
+  URGENT: "Urgent",
+};
+
+export const PRIORITY_TONE: Record<Priority, BadgeTone> = {
+  LOW: "neutral",
+  MEDIUM: "brand",
+  HIGH: "serious",
+  URGENT: "critical",
+};
+
+export const CATEGORY_LABEL: Record<Category, string> = {
+  ACCESS: "Access & identity",
+  HARDWARE: "Hardware",
+  SOFTWARE: "Software",
+  DATABASE: "Database",
+  DEVOPS: "DevOps & cloud",
+  NETWORK: "Network",
+  OTHER: "Other",
+};
+
+export const RISK_LABEL: Record<RiskLevel, string> = {
+  LOW: "Low risk",
+  MEDIUM: "Medium risk",
+  HIGH: "High risk",
+};
+
+export const RISK_TONE: Record<RiskLevel, BadgeTone> = {
+  LOW: "good",
+  MEDIUM: "warn",
+  HIGH: "critical",
+};
+
+export const RUN_STATUS_LABEL: Record<RunStatus, string> = {
+  RUNNING: "Running",
+  WAITING_APPROVAL: "Waiting approval",
+  COMPLETED: "Completed",
+  FAILED: "Failed",
+};
+
+export const RUN_STATUS_TONE: Record<RunStatus, BadgeTone> = {
+  RUNNING: "violet",
+  WAITING_APPROVAL: "warn",
+  COMPLETED: "good",
+  FAILED: "critical",
+};
+
+export const APPROVAL_STATUS_TONE: Record<ApprovalStatus, BadgeTone> = {
+  PENDING: "warn",
+  APPROVED: "good",
+  REJECTED: "critical",
+};

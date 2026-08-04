@@ -1,0 +1,16 @@
+services:
+  servo:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "file:/data/servo.db"
+      OPS_DATABASE_URL: "file:/data/ops.db"
+      # Bring your own key (optional — without it Servo runs in mock mode):
+      # ANTHROPIC_API_KEY: "sk-ant-..."
+    volumes:
+      - servo-data:/data
+    restart: unless-stopped
+
+volumes:
+  servo-data:

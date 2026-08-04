@@ -1,0 +1,631 @@
+// The agent engine: triage runs, the resolver loop with approval pauses, the
+// resume-after-approval continuation and the automated QA review. The
+// conversation (Messages API shape) is persisted to run.conversation on every
+// state change — that is what makes a paused run resumable purely from the
+// database (run.conversation + the Approval row's toolUseId).
+
+import type { AgentRun, AgentStep, Ticket, ToolPolicy, User } from "@prisma/client";
+import { db } from "@/lib/db";
+import type {
+  AiKind,
+  Category,
+  ContentBlock,
+  ConversationMessage,
+  Priority,
+  StepType,
+} from "@/lib/types";
+import { CATEGORIES, PRIORITIES } from "@/lib/types";
+import { qaPrompt, qaSystem, resolverSystem, triageSystem, triageUser } from "./prompts";
+import { getProvider, type ChatProvider, type ToolSpec } from "./provider";
+import { getAiSettings, type AiSettings } from "./settings";
+import { TOOLS } from "./tools";
+
+const MAX_ITERATIONS = 12;
+
+type TicketWithRequester = Ticket & { requester: User };
+
+interface LoopContext {
+  runId: string;
+  ticket: TicketWithRequester;
+  agentUser: User;
+  settings: AiSettings;
+  provider: ChatProvider;
+  system: string;
+  toolSpecs: ToolSpec[];
+  policies: Map<string, ToolPolicy>;
+  messages: ConversationMessage[];
+  nextIndex: number;
+}
+
+// -- small shared helpers ----------------------------------------------------
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+/** Parse a JSON object out of a model reply, tolerating code fences/prose. */
+function parseJsonLoose(text: string): Record<string, unknown> {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fenced ? fenced[1] : text;
+  const object = candidate.match(/\{[\s\S]*\}/);
+  if (!object) throw new Error("The model reply did not contain a JSON object.");
+  return JSON.parse(object[0]) as Record<string, unknown>;
+}
+
+async function getAiUser(kind: AiKind): Promise<User> {
+  const user = await db.user.findFirst({ where: { role: "AI_AGENT", aiKind: kind } });
+  if (!user) throw new Error(`No AI agent user with kind ${kind} — re-run the seed.`);
+  return user;
+}
+
+async function loadTicket(ticketId: string): Promise<TicketWithRequester> {
+  const ticket = await db.ticket.findUnique({
+    where: { id: ticketId },
+    include: { requester: true },
+  });
+  if (!ticket) throw new Error("Ticket not found.");
+  return ticket;
+}
+
+function loadRun(runId: string): Promise<AgentRun & { steps: AgentStep[] }> {
+  return db.agentRun.findUniqueOrThrow({
+    where: { id: runId },
+    include: { steps: { orderBy: { index: "asc" } }, approvals: true },
+  });
+}
+
+async function persistConversation(ctx: LoopContext): Promise<void> {
+  await db.agentRun.update({
+    where: { id: ctx.runId },
+    data: { conversation: JSON.stringify(ctx.messages) },
+  });
+}
+
+async function addStep(
+  ctx: LoopContext,
+  step: { type: StepType; content: string; toolName?: string | null; riskLevel?: string | null },
+): Promise<void> {
+  await db.agentStep.create({
+    data: {
+      runId: ctx.runId,
+      index: ctx.nextIndex++,
+      type: step.type,
+      toolName: step.toolName ?? null,
+      riskLevel: step.riskLevel ?? null,
+      content: step.content,
+    },
+  });
+}
+
+/**
+ * Append a tool_result block to the conversation. Tool results for one
+ * assistant turn must share a single user message, so we extend the trailing
+ * tool_result message when there is one.
+ */
+function appendToolResult(
+  messages: ConversationMessage[],
+  block: Extract<ContentBlock, { type: "tool_result" }>,
+): void {
+  const last = messages[messages.length - 1];
+  if (last && last.role === "user" && last.content.every((b) => b.type === "tool_result")) {
+    last.content.push(block);
+  } else {
+    messages.push({ role: "user", content: [block] });
+  }
+}
+
+/** Never leave a run RUNNING: mark FAILED, add ERROR step, ticket → TRIAGED. */
+async function failRun(runId: string, ticketId: string, err: unknown): Promise<void> {
+  const message = errorMessage(err);
+  try {
+    await db.agentRun.update({
+      where: { id: runId },
+      data: { status: "FAILED", error: message, completedAt: new Date() },
+    });
+  } catch {
+    /* keep going — the remaining cleanup is still worth attempting */
+  }
+  try {
+    const lastStep = await db.agentStep.findFirst({
+      where: { runId },
+      orderBy: { index: "desc" },
+    });
+    await db.agentStep.create({
+      data: { runId, index: (lastStep?.index ?? -1) + 1, type: "ERROR", content: message },
+    });
+  } catch {
+    /* ignore */
+  }
+  try {
+    await db.ticket.update({
+      where: { id: ticketId },
+      data: { status: "TRIAGED", resolvedAt: null },
+    });
+  } catch {
+    /* ignore */
+  }
+}
+
+function toolSpecsFor(policies: ToolPolicy[]): ToolSpec[] {
+  return policies
+    .filter((policy) => TOOLS[policy.toolName])
+    .map((policy) => {
+      const tool = TOOLS[policy.toolName];
+      return { name: tool.name, description: tool.description, inputSchema: tool.inputSchema };
+    });
+}
+
+async function buildLoopContext(
+  runId: string,
+  ticket: TicketWithRequester,
+  agentUser: User,
+  messages: ConversationMessage[],
+  nextIndex: number,
+): Promise<LoopContext> {
+  const settings = await getAiSettings();
+  const enabledPolicies = await db.toolPolicy.findMany({ where: { enabled: true } });
+  return {
+    runId,
+    ticket,
+    agentUser,
+    settings,
+    provider: getProvider(settings, { ticket, kind: "RESOLVE" }),
+    system: resolverSystem(enabledPolicies),
+    toolSpecs: toolSpecsFor(enabledPolicies),
+    policies: new Map(enabledPolicies.map((policy) => [policy.toolName, policy])),
+    messages,
+    nextIndex,
+  };
+}
+
+// -- triage -------------------------------------------------------------------
+
+export async function runTriage(ticketId: string): Promise<AgentRun> {
+  const ticket = await loadTicket(ticketId);
+  const triageAgent = await getAiUser("TRIAGE");
+  const settings = await getAiSettings();
+  const provider = getProvider(settings, { ticket, kind: "TRIAGE" });
+
+  const messages: ConversationMessage[] = [
+    { role: "user", content: [{ type: "text", text: triageUser(ticket) }] },
+  ];
+  const run = await db.agentRun.create({
+    data: {
+      ticketId,
+      agentUserId: triageAgent.id,
+      kind: "TRIAGE",
+      status: "RUNNING",
+      conversation: JSON.stringify(messages),
+    },
+  });
+
+  try {
+    const turn = await provider.complete({ system: triageSystem, messages, tools: [] });
+    messages.push({ role: "assistant", content: [{ type: "text", text: turn.text }] });
+
+    const parsed = parseJsonLoose(turn.text);
+    const category = CATEGORIES.includes(parsed.category as Category)
+      ? (parsed.category as Category)
+      : "OTHER";
+    const priority = PRIORITIES.includes(parsed.priority as Priority)
+      ? (parsed.priority as Priority)
+      : "MEDIUM";
+    const assignTo = parsed.assignTo === "AI" ? "AI" : "HUMAN";
+    const rationale =
+      typeof parsed.rationale === "string" && parsed.rationale
+        ? parsed.rationale
+        : "Classified automatically.";
+
+    const resolverAgent = assignTo === "AI" ? await getAiUser("RESOLVER") : null;
+    await db.ticket.update({
+      where: { id: ticketId },
+      data: {
+        category,
+        priority,
+        status: "TRIAGED",
+        ...(resolverAgent ? { assigneeId: resolverAgent.id } : {}),
+      },
+    });
+    await db.comment.create({
+      data: {
+        ticketId,
+        authorId: triageAgent.id,
+        kind: "SYSTEM",
+        body: `Triage: ${rationale}`,
+      },
+    });
+    await db.agentStep.create({
+      data: { runId: run.id, index: 0, type: "TEXT", content: rationale },
+    });
+    await db.agentRun.update({
+      where: { id: run.id },
+      data: {
+        status: "COMPLETED",
+        summary: `Triaged as ${category}/${priority}; ${
+          assignTo === "AI" ? "assigned to the AI resolver" : "left for human assignment"
+        }.`,
+        completedAt: new Date(),
+        conversation: JSON.stringify(messages),
+      },
+    });
+  } catch (err) {
+    // Triage failures leave the ticket untouched.
+    const message = errorMessage(err);
+    try {
+      await db.agentRun.update({
+        where: { id: run.id },
+        data: {
+          status: "FAILED",
+          error: message,
+          completedAt: new Date(),
+          conversation: JSON.stringify(messages),
+        },
+      });
+    } catch {
+      /* ignore */
+    }
+    try {
+      await db.agentStep.create({
+        data: { runId: run.id, index: 0, type: "ERROR", content: message },
+      });
+    } catch {
+      /* ignore */
+    }
+  }
+  return loadRun(run.id);
+}
+
+// -- resolver -----------------------------------------------------------------
+
+// In-process guard closing the check-then-create race between the two entry
+// points (POST /runs and the PATCH assign side effect); the DB findFirst below
+// covers persisted state (e.g. WAITING_APPROVAL pauses) across restarts.
+const activeResolverTickets = new Set<string>();
+
+export async function runResolver(ticketId: string): Promise<AgentRun> {
+  if (activeResolverTickets.has(ticketId)) {
+    throw new Error("An agent run is already in progress for this ticket.");
+  }
+  activeResolverTickets.add(ticketId);
+  try {
+    return await runResolverInner(ticketId);
+  } finally {
+    activeResolverTickets.delete(ticketId);
+  }
+}
+
+async function runResolverInner(ticketId: string): Promise<AgentRun> {
+  const ticket = await loadTicket(ticketId);
+  const active = await db.agentRun.findFirst({
+    where: { ticketId, status: { in: ["RUNNING", "WAITING_APPROVAL"] } },
+  });
+  if (active) throw new Error("An agent run is already in progress for this ticket.");
+  const resolverAgent = await getAiUser("RESOLVER");
+
+  const messages: ConversationMessage[] = [
+    {
+      role: "user",
+      content: [
+        {
+          type: "text",
+          text: `Ticket #${ticket.number}: ${ticket.title}\n\n${ticket.description}\n\nRequester: ${ticket.requester.name} <${ticket.requester.email}>`,
+        },
+      ],
+    },
+  ];
+  const run = await db.agentRun.create({
+    data: {
+      ticketId,
+      agentUserId: resolverAgent.id,
+      kind: "RESOLVE",
+      status: "RUNNING",
+      conversation: JSON.stringify(messages),
+    },
+  });
+  try {
+    await db.ticket.update({ where: { id: ticketId }, data: { status: "IN_PROGRESS" } });
+    const ctx = await buildLoopContext(run.id, ticket, resolverAgent, messages, 0);
+    await driveResolverLoop(ctx);
+  } catch (err) {
+    await failRun(run.id, ticketId, err);
+  }
+  return loadRun(run.id);
+}
+
+/**
+ * The shared resolver loop (used by fresh runs and by resumeAfterApproval).
+ * Calls the provider, persists steps and the conversation, executes tools,
+ * and pauses (returns) when a tool requires human approval.
+ */
+async function driveResolverLoop(ctx: LoopContext): Promise<"completed" | "paused"> {
+  for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+    const turn = await ctx.provider.complete({
+      system: ctx.system,
+      messages: ctx.messages,
+      tools: ctx.toolSpecs,
+    });
+
+    const assistantBlocks: ContentBlock[] = [];
+    if (turn.text) assistantBlocks.push({ type: "text", text: turn.text });
+    for (const call of turn.toolCalls) {
+      assistantBlocks.push({ type: "tool_use", id: call.id, name: call.name, input: call.input });
+    }
+    if (assistantBlocks.length === 0) assistantBlocks.push({ type: "text", text: "" });
+    ctx.messages.push({ role: "assistant", content: assistantBlocks });
+    await persistConversation(ctx);
+
+    if (turn.text) await addStep(ctx, { type: "TEXT", content: turn.text });
+
+    if (turn.toolCalls.length === 0) {
+      await db.agentRun.update({
+        where: { id: ctx.runId },
+        data: { status: "COMPLETED", summary: turn.text || null, completedAt: new Date() },
+      });
+      await runQaReview(ctx);
+      return "completed";
+    }
+
+    for (let i = 0; i < turn.toolCalls.length; i++) {
+      const call = turn.toolCalls[i];
+      const tool = TOOLS[call.name];
+      const policy = ctx.policies.get(call.name);
+
+      if (!tool || !policy) {
+        const message = `Tool "${call.name}" is not available or has been disabled by policy.`;
+        await addStep(ctx, {
+          type: "TOOL_CALL",
+          toolName: call.name,
+          content: JSON.stringify(call.input),
+        });
+        await addStep(ctx, { type: "TOOL_RESULT", toolName: call.name, content: message });
+        appendToolResult(ctx.messages, {
+          type: "tool_result",
+          tool_use_id: call.id,
+          content: message,
+          is_error: true,
+        });
+        await persistConversation(ctx);
+        continue;
+      }
+
+      if (policy.requiresApproval) {
+        await db.approval.create({
+          data: {
+            runId: ctx.runId,
+            ticketId: ctx.ticket.id,
+            toolName: call.name,
+            toolInput: JSON.stringify(call.input),
+            toolUseId: call.id,
+            riskLevel: policy.riskLevel,
+            status: "PENDING",
+          },
+        });
+        await addStep(ctx, {
+          type: "APPROVAL_REQUEST",
+          toolName: call.name,
+          content: JSON.stringify(call.input),
+          riskLevel: policy.riskLevel,
+        });
+        // Sibling tool calls after the paused one would leave dangling
+        // tool_use blocks — close them so the conversation stays valid.
+        for (const skipped of turn.toolCalls.slice(i + 1)) {
+          appendToolResult(ctx.messages, {
+            type: "tool_result",
+            tool_use_id: skipped.id,
+            content:
+              "Not executed: a preceding tool call is waiting for human approval. Request it again after the decision if still needed.",
+            is_error: true,
+          });
+        }
+        await db.agentRun.update({
+          where: { id: ctx.runId },
+          data: { status: "WAITING_APPROVAL" },
+        });
+        await db.ticket.update({
+          where: { id: ctx.ticket.id },
+          data: { status: "WAITING_APPROVAL" },
+        });
+        await persistConversation(ctx);
+        return "paused";
+      }
+
+      await addStep(ctx, {
+        type: "TOOL_CALL",
+        toolName: call.name,
+        content: JSON.stringify(call.input),
+        riskLevel: policy.riskLevel,
+      });
+      let result: string;
+      let isError = false;
+      try {
+        result = await tool.execute(call.input, {
+          ticketId: ctx.ticket.id,
+          runId: ctx.runId,
+          agentUser: ctx.agentUser,
+        });
+      } catch (err) {
+        result = errorMessage(err);
+        isError = true;
+      }
+      await addStep(ctx, { type: "TOOL_RESULT", toolName: call.name, content: result });
+      appendToolResult(ctx.messages, {
+        type: "tool_result",
+        tool_use_id: call.id,
+        content: result,
+        ...(isError ? { is_error: true } : {}),
+      });
+      await persistConversation(ctx);
+    }
+  }
+  throw new Error(`Resolver run exceeded ${MAX_ITERATIONS} iterations without completing.`);
+}
+
+// -- resume after approval ----------------------------------------------------
+
+export async function resumeAfterApproval(approvalId: string): Promise<AgentRun> {
+  const approval = await db.approval.findUnique({
+    where: { id: approvalId },
+    include: { decider: true },
+  });
+  if (!approval) throw new Error("Approval not found.");
+  if (approval.status === "PENDING") throw new Error("Approval has not been decided yet.");
+
+  // Intentionally outside the try: a run that is not paused must not be
+  // resumed (and must not be marked FAILED by the catch below).
+  const run = await db.agentRun.findUniqueOrThrow({ where: { id: approval.runId } });
+  if (run.status !== "WAITING_APPROVAL") {
+    throw new Error("Run is not waiting for approval.");
+  }
+
+  try {
+    const ticket = await loadTicket(approval.ticketId);
+    const agentUser = await db.user.findUniqueOrThrow({ where: { id: run.agentUserId } });
+    const messages = JSON.parse(run.conversation) as ConversationMessage[];
+    const lastStep = await db.agentStep.findFirst({
+      where: { runId: run.id },
+      orderBy: { index: "desc" },
+    });
+    const ctx = await buildLoopContext(
+      run.id,
+      ticket,
+      agentUser,
+      messages,
+      (lastStep?.index ?? -1) + 1,
+    );
+
+    if (approval.status === "APPROVED") {
+      const input = JSON.parse(approval.toolInput) as Record<string, unknown>;
+      const tool = TOOLS[approval.toolName];
+      await addStep(ctx, {
+        type: "TOOL_CALL",
+        toolName: approval.toolName,
+        content: approval.toolInput,
+        riskLevel: approval.riskLevel,
+      });
+      let result: string;
+      let isError = false;
+      if (!tool) {
+        result = `Tool "${approval.toolName}" is not available.`;
+        isError = true;
+      } else {
+        try {
+          result = await tool.execute(input, {
+            ticketId: ticket.id,
+            runId: run.id,
+            agentUser,
+          });
+        } catch (err) {
+          result = errorMessage(err);
+          isError = true;
+        }
+      }
+      await addStep(ctx, { type: "TOOL_RESULT", toolName: approval.toolName, content: result });
+      appendToolResult(ctx.messages, {
+        type: "tool_result",
+        tool_use_id: approval.toolUseId,
+        content: result,
+        ...(isError ? { is_error: true } : {}),
+      });
+    } else {
+      const reason = approval.reason?.trim() ? approval.reason : "No reason provided.";
+      const deciderName = approval.decider?.name ?? "a human reviewer";
+      const message = `Rejected by ${deciderName}: ${reason}`;
+      await addStep(ctx, { type: "TOOL_RESULT", toolName: approval.toolName, content: message });
+      appendToolResult(ctx.messages, {
+        type: "tool_result",
+        tool_use_id: approval.toolUseId,
+        content: message,
+        is_error: true,
+      });
+      await db.comment.create({
+        data: {
+          ticketId: ticket.id,
+          authorId: agentUser.id,
+          kind: "SYSTEM",
+          body: `Approval for ${approval.toolName} was rejected by ${deciderName}: ${reason}`,
+        },
+      });
+    }
+
+    await db.agentRun.update({ where: { id: run.id }, data: { status: "RUNNING" } });
+    await db.ticket.update({ where: { id: ticket.id }, data: { status: "IN_PROGRESS" } });
+    await persistConversation(ctx);
+
+    await driveResolverLoop(ctx);
+  } catch (err) {
+    await failRun(run.id, approval.ticketId, err);
+  }
+  return loadRun(run.id);
+}
+
+// -- QA review ----------------------------------------------------------------
+
+/**
+ * Reviews a completed run when a MEDIUM/HIGH-risk tool was executed and QA is
+ * enabled. Best-effort: a QA failure never un-completes the run.
+ */
+async function runQaReview(ctx: LoopContext): Promise<void> {
+  if (!ctx.settings.qaEnabled) return;
+  // Derive riskiness from persisted steps so it survives pause/resume cycles
+  // (an in-memory flag would be lost when the loop context is rebuilt).
+  const riskyExecuted = await db.agentStep.count({
+    where: {
+      runId: ctx.runId,
+      type: "TOOL_CALL",
+      riskLevel: { in: ["MEDIUM", "HIGH"] },
+    },
+  });
+  if (riskyExecuted === 0) return;
+  try {
+    const run = await db.agentRun.findUniqueOrThrow({
+      where: { id: ctx.runId },
+      include: { steps: { orderBy: { index: "asc" } } },
+    });
+    const qaProvider = getProvider(ctx.settings, { ticket: ctx.ticket, kind: "QA" });
+    const turn = await qaProvider.complete({
+      system: qaSystem,
+      messages: [
+        { role: "user", content: [{ type: "text", text: qaPrompt(run, ctx.ticket) }] },
+      ],
+      tools: [],
+    });
+    const parsed = parseJsonLoose(turn.text);
+    const verdict = parsed.verdict === "FAIL" ? "FAIL" : "PASS";
+    const notes = typeof parsed.notes === "string" ? parsed.notes : "";
+
+    await db.agentRun.update({
+      where: { id: ctx.runId },
+      data: { qaVerdict: verdict, qaNotes: notes },
+    });
+    await addStep(ctx, {
+      type: "QA_REVIEW",
+      content: `${verdict}${notes ? ` — ${notes}` : ""}`,
+    });
+
+    if (verdict === "FAIL") {
+      const humanAgent = await db.user.findFirst({
+        where: { role: "AGENT" },
+        orderBy: { createdAt: "asc" },
+      });
+      await db.ticket.update({
+        where: { id: ctx.ticket.id },
+        data: {
+          status: "IN_PROGRESS",
+          resolvedAt: null,
+          ...(humanAgent ? { assigneeId: humanAgent.id } : {}),
+        },
+      });
+      const qaUser = await db.user.findFirst({ where: { role: "AI_AGENT", aiKind: "QA" } });
+      await db.comment.create({
+        data: {
+          ticketId: ctx.ticket.id,
+          authorId: (qaUser ?? ctx.agentUser).id,
+          kind: "SYSTEM",
+          body: `QA flagged this run — reassigned to a human agent. ${notes}`,
+        },
+      });
+    }
+  } catch {
+    // QA is best-effort; the run stays COMPLETED even if review fails.
+  }
+}

@@ -1,0 +1,296 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ---------------------------------------------------------------------------
+   Servo theme — shadcn/ui, light by default, green primary ("Spotify style").
+   Token values provided by the project owner.
+--------------------------------------------------------------------------- */
+:root {
+  --radius: 0.625rem;
+
+  --background: oklch(0.988 0.004 160);
+  --foreground: oklch(0.35 0.02 165.48);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.35 0.02 165.48);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.35 0.02 165.48);
+  --primary: oklch(0.64 0.165 154);
+  /* Dark ink on the vibrant green (Spotify-style) — white on this green only
+     reaches ~2.7:1; dark ink reaches ~7:1. */
+  --primary-foreground: oklch(0.16 0.035 168);
+  /* Darker companion for green used AS TEXT on light surfaces (links, hovers). */
+  --primary-strong: oklch(0.46 0.12 157);
+  --secondary: oklch(0.9 0.02 238.66);
+  --secondary-foreground: oklch(0.2 0.02 266.02);
+  --muted: oklch(0.9 0.02 240.73);
+  --muted-foreground: oklch(0.47 0.03 268.53);
+  --accent: oklch(0.93 0.045 158);
+  --accent-foreground: oklch(0.32 0.06 163);
+  --destructive: oklch(0.55 0.22 22);
+  --border: oklch(0.94 0.01 238.46);
+  --input: oklch(0.85 0.02 240.75);
+  --ring: oklch(0.64 0.165 154);
+  /* Chart marks need ≥3:1 against the white card. */
+  --chart-1: oklch(0.62 0.16 154);
+  --chart-2: oklch(0.5 0.1 270.06);
+  --chart-3: oklch(0.58 0.11 202);
+  --chart-4: oklch(0.63 0.11 90);
+  --chart-5: oklch(0.6 0.15 300.14);
+  /* Deep-green brand panel (the "Servo side panel"), fixed across modes. */
+  --sidebar: oklch(0.26 0.055 158);
+  --sidebar-foreground: oklch(0.94 0.014 160);
+  --sidebar-primary: oklch(0.64 0.165 154);
+  --sidebar-primary-foreground: oklch(0.13 0.03 170);
+  --sidebar-accent: oklch(0.33 0.065 158);
+  --sidebar-accent-foreground: oklch(0.97 0.014 160);
+  --sidebar-border: oklch(0.34 0.055 158);
+  --sidebar-ring: oklch(0.64 0.165 154);
+
+  /* Semantic status tones (badges, QA verdicts, highlights) — mode-aware. */
+  --tone-good: oklch(0.45 0.13 155);
+  --tone-good-soft: oklch(0.94 0.05 153);
+  --tone-warn: oklch(0.49 0.1 78);
+  --tone-warn-soft: oklch(0.96 0.06 90);
+  --tone-serious: oklch(0.5 0.14 42);
+  --tone-serious-soft: oklch(0.95 0.04 45);
+  --tone-critical: oklch(0.5 0.2 25);
+  --tone-critical-soft: oklch(0.95 0.03 20);
+  --tone-violet: oklch(0.48 0.15 295);
+  --tone-violet-soft: oklch(0.94 0.04 295);
+
+  --shadow-2xs: 0px 1px 3px 0px oklch(0.35 0.05 163.5 / 0.02);
+  --shadow-xs: 0px 1px 3px 0px oklch(0.35 0.05 163.5 / 0.02);
+  --shadow-sm: 0px 1px 3px 0px oklch(0.35 0.05 163.5 / 0.04),
+    0px 1px 2px -1px oklch(0.35 0.05 163.5 / 0.04);
+  --shadow: 0px 1px 3px 0px oklch(0.35 0.05 163.5 / 0.04),
+    0px 1px 2px -1px oklch(0.35 0.05 163.5 / 0.04);
+  --shadow-md: 0px 1px 3px 0px oklch(0.35 0.05 163.5 / 0.04),
+    0px 2px 4px -1px oklch(0.35 0.05 163.5 / 0.04);
+  --shadow-lg: 0px 1px 3px 0px oklch(0.35 0.05 163.5 / 0.04),
+    0px 4px 6px -1px oklch(0.35 0.05 163.5 / 0.04);
+  --shadow-xl: 0px 1px 3px 0px oklch(0.35 0.05 163.5 / 0.04),
+    0px 8px 10px -1px oklch(0.35 0.05 163.5 / 0.04);
+  --shadow-2xl: 0px 1px 3px 0px oklch(0.35 0.05 163.5 / 0.1);
+}
+
+.dark {
+  --background: oklch(0.15 0.02 269.18);
+  --foreground: oklch(0.95 0.01 238.46);
+  --card: oklch(0.2 0.02 266.02);
+  --card-foreground: oklch(0.95 0.01 238.46);
+  --popover: oklch(0.2 0.02 266.02);
+  --popover-foreground: oklch(0.95 0.01 238.46);
+  --primary: oklch(0.64 0.165 154);
+  --primary-foreground: oklch(0.15 0.02 269.18);
+  --primary-strong: oklch(0.75 0.15 155);
+  --secondary: oklch(0.3 0.03 271.05);
+  --secondary-foreground: oklch(0.95 0.01 238.46);
+  --muted: oklch(0.3 0.03 271.05);
+  --muted-foreground: oklch(0.68 0.03 269.46);
+  --accent: oklch(0.32 0.05 168);
+  --accent-foreground: oklch(0.95 0.02 160);
+  --destructive: oklch(0.64 0.25 19.69);
+  --border: oklch(0.95 0.01 238.46 / 15%);
+  --input: oklch(0.95 0.01 238.46 / 20%);
+  --ring: oklch(0.64 0.165 154);
+  --chart-1: oklch(0.67 0.17 153.85);
+  --chart-2: oklch(0.6 0.1 269.83);
+  --chart-3: oklch(0.72 0.12 201.79);
+  --chart-4: oklch(0.8 0.1 100.65);
+  --chart-5: oklch(0.6 0.15 300.14);
+  --sidebar: oklch(0.2 0.042 162);
+  --sidebar-foreground: oklch(0.94 0.014 160);
+  --sidebar-primary: oklch(0.64 0.165 154);
+  --sidebar-primary-foreground: oklch(0.13 0.03 170);
+  --sidebar-accent: oklch(0.27 0.055 160);
+  --sidebar-accent-foreground: oklch(0.97 0.014 160);
+  --sidebar-border: oklch(0.28 0.048 160);
+  --sidebar-ring: oklch(0.64 0.165 154);
+
+  /* Dark-mode status tones: deep tinted chips with light text. */
+  --tone-good: oklch(0.8 0.14 155);
+  --tone-good-soft: oklch(0.26 0.05 155);
+  --tone-warn: oklch(0.85 0.11 90);
+  --tone-warn-soft: oklch(0.28 0.05 85);
+  --tone-serious: oklch(0.8 0.12 50);
+  --tone-serious-soft: oklch(0.27 0.05 45);
+  --tone-critical: oklch(0.82 0.14 22);
+  --tone-critical-soft: oklch(0.28 0.08 25);
+  --tone-violet: oklch(0.82 0.09 295);
+  --tone-violet-soft: oklch(0.29 0.06 295);
+
+  --shadow-2xs: 0px 1px 2px 0px oklch(0 0 0 / 0.01);
+  --shadow-xs: 0px 1px 2px 0px oklch(0 0 0 / 0.01);
+  --shadow-sm: 0px 1px 2px 0px oklch(0 0 0 / 0.01),
+    0px 1px 2px -1px oklch(0 0 0 / 0.01);
+  --shadow: 0px 1px 2px 0px oklch(0 0 0 / 0.01),
+    0px 1px 2px -1px oklch(0 0 0 / 0.01);
+  --shadow-md: 0px 1px 2px 0px oklch(0 0 0 / 0.01),
+    0px 2px 4px -1px oklch(0 0 0 / 0.01);
+  --shadow-lg: 0px 1px 2px 0px oklch(0 0 0 / 0.01),
+    0px 4px 6px -1px oklch(0 0 0 / 0.01);
+  --shadow-xl: 0px 1px 2px 0px oklch(0 0 0 / 0.01),
+    0px 8px 10px -1px oklch(0 0 0 / 0.01);
+  --shadow-2xl: 0px 1px 2px 0px oklch(0 0 0 / 0.03);
+}
+
+@theme inline {
+  --font-sans: var(--font-lato), system-ui, sans-serif;
+  --font-heading: var(--font-lato), system-ui, sans-serif;
+  --font-body: var(--font-merriweather), Georgia, serif;
+  --font-mono: var(--font-roboto-mono), ui-monospace, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  --shadow-2xs: var(--shadow-2xs);
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow: var(--shadow);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-2xl: var(--shadow-2xl);
+
+  /* -- Legacy Servo aliases (pre-shadcn markup keeps rendering during the
+        migration; new code must use the shadcn tokens above) -------------- */
+  --color-bg: var(--background);
+  --color-surface: var(--card);
+  --color-surface-2: var(--muted);
+  --color-line: var(--border);
+  --color-line-strong: var(--input);
+  --color-ink: var(--foreground);
+  --color-ink-2: var(--muted-foreground);
+  --color-ink-3: var(--muted-foreground);
+  --color-brand: var(--primary);
+  --color-brand-deep: oklch(0.28 0.05 160);
+  --color-brand-soft: oklch(0.93 0.05 155);
+  --color-brand-ink: var(--primary-foreground);
+  --color-primary-strong: var(--primary-strong);
+  --color-good: var(--tone-good);
+  --color-good-soft: var(--tone-good-soft);
+  --color-warn: var(--tone-warn);
+  --color-warn-soft: var(--tone-warn-soft);
+  --color-serious: var(--tone-serious);
+  --color-serious-soft: var(--tone-serious-soft);
+  --color-critical: var(--tone-critical);
+  --color-critical-soft: var(--tone-critical-soft);
+  --color-violet: var(--tone-violet);
+  --color-violet-soft: var(--tone-violet-soft);
+  --font-display: var(--font-lato), system-ui, sans-serif;
+  --radius-card: var(--radius);
+  --shadow-card: var(--shadow-sm);
+  --shadow-pop: var(--shadow-lg);
+}
+
+/* ---------------------------------------------------------------------------
+   Dataviz tokens for any hand-rolled SVG charts (status colors are semantic
+   and reserved — never used as series colors).
+--------------------------------------------------------------------------- */
+:root {
+  --status-good: oklch(0.67 0.17 153.85);
+  --status-warning: oklch(0.8 0.15 85);
+  --status-serious: oklch(0.7 0.15 45);
+  --status-critical: oklch(0.61 0.24 20.96);
+  --chart-grid: var(--border);
+  --chart-axis: var(--input);
+  --chart-muted: var(--muted-foreground);
+  --chart-surface: var(--card);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+    line-height: 1.65;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-heading);
+  }
+  h1 {
+    font-size: 2.25rem;
+    line-height: 1.2;
+    letter-spacing: -0.025em;
+    font-weight: 700;
+  }
+  h2 {
+    font-size: 1.875rem;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+  }
+  h3 {
+    font-size: 1.5rem;
+    line-height: 1.3;
+    letter-spacing: -0.015em;
+    font-weight: 600;
+  }
+  h4 {
+    font-size: 1.25rem;
+    line-height: 1.4;
+    letter-spacing: -0.01em;
+    font-weight: 500;
+  }
+  h5 {
+    font-size: 1.125rem;
+    line-height: 1.5;
+    font-weight: 500;
+  }
+  h6 {
+    font-size: 1rem;
+    line-height: 1.5;
+    font-weight: 500;
+  }
+  code,
+  pre {
+    font-family: var(--font-mono);
+  }
+}

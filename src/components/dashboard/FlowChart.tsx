@@ -1,0 +1,99 @@
+"use client";
+
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import {
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
+
+interface Point {
+  date: string; // YYYY-MM-DD
+  created: number;
+  resolved: number;
+}
+
+const config = {
+  created: { label: "Created", color: "var(--chart-2)" },
+  resolved: { label: "Resolved", color: "var(--chart-1)" },
+} satisfies ChartConfig;
+
+function fmtDate(d: string): string {
+  return new Date(d + "T00:00:00").toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+export default function FlowChart({ data }: { data: Point[] }) {
+  const empty = data.every((p) => p.created === 0 && p.resolved === 0);
+  if (empty) {
+    return (
+      <div className="flex h-[280px] items-center justify-center font-sans text-sm text-muted-foreground">
+        No ticket activity in the last 30 days.
+      </div>
+    );
+  }
+
+  return (
+    <ChartContainer config={config} className="aspect-auto h-[280px] w-full">
+      <AreaChart data={data} margin={{ left: 0, right: 12, top: 8 }}>
+        <defs>
+          <linearGradient id="fillCreated" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="var(--color-created)" stopOpacity={0.5} />
+            <stop offset="95%" stopColor="var(--color-created)" stopOpacity={0.04} />
+          </linearGradient>
+          <linearGradient id="fillResolved" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="var(--color-resolved)" stopOpacity={0.5} />
+            <stop offset="95%" stopColor="var(--color-resolved)" stopOpacity={0.04} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid vertical={false} />
+        <XAxis
+          dataKey="date"
+          tickLine={false}
+          axisLine={false}
+          tickMargin={10}
+          minTickGap={48}
+          tickFormatter={fmtDate}
+        />
+        <YAxis
+          width={28}
+          tickLine={false}
+          axisLine={false}
+          allowDecimals={false}
+          tickMargin={6}
+        />
+        <ChartTooltip
+          cursor={false}
+          content={
+            <ChartTooltipContent
+              indicator="dot"
+              labelFormatter={(value) => fmtDate(String(value))}
+            />
+          }
+        />
+        <Area
+          dataKey="created"
+          type="monotone"
+          fill="url(#fillCreated)"
+          stroke="var(--color-created)"
+          strokeWidth={2}
+          isAnimationActive={false}
+        />
+        <Area
+          dataKey="resolved"
+          type="monotone"
+          fill="url(#fillResolved)"
+          stroke="var(--color-resolved)"
+          strokeWidth={2}
+          isAnimationActive={false}
+        />
+        <ChartLegend content={<ChartLegendContent />} />
+      </AreaChart>
+    </ChartContainer>
+  );
+}

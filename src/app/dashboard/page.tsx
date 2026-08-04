@@ -1,0 +1,127 @@
+import { Lock } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import EmptyState from "@/components/legacy/EmptyState";
+import PageHeader from "@/components/shell/PageHeader";
+import { getCurrentUser } from "@/lib/auth";
+import { can } from "@/lib/permissions";
+import { getKpis } from "@/lib/tickets";
+import type { KpiResponse } from "@/lib/types";
+import CardHeading from "@/components/dashboard/CardHeading";
+import StatTile from "@/components/dashboard/StatTile";
+import FlowChart from "@/components/dashboard/FlowChart";
+import CategoryBars from "@/components/dashboard/CategoryBars";
+import PriorityBars from "@/components/dashboard/PriorityBars";
+import AiVsHumanBar from "@/components/dashboard/AiVsHumanBar";
+import ApprovalsTile from "@/components/dashboard/ApprovalsTile";
+
+export const dynamic = "force-dynamic";
+
+export default async function DashboardPage() {
+  const user = await getCurrentUser();
+
+  if (!can(user, "kpi.view")) {
+    return (
+      <>
+        <PageHeader
+          title="Dashboard"
+          description="Operational KPIs across tickets, agents and approvals."
+        />
+        <div className="p-4 md:p-8">
+          <EmptyState
+            icon={Lock}
+            title="KPIs are restricted"
+            hint="Only admins and agents can view the dashboard. Switch to an admin or agent user from the sidebar."
+          />
+        </div>
+      </>
+    );
+  }
+
+  const kpis: KpiResponse = await getKpis();
+  const { totals, approvalStats } = kpis;
+
+  const aiResolved = kpis.aiVsHuman.find((r) => r.resolver === "AI")?.count ?? 0;
+  const humanResolved =
+    kpis.aiVsHuman.find((r) => r.resolver === "HUMAN")?.count ?? 0;
+
+  return (
+    <>
+      <PageHeader
+        title="Dashboard"
+        description="Operational KPIs across tickets, agents and approvals — last 30 days."
+      />
+      <div className="grid grid-cols-12 gap-4 p-4 md:p-8">
+        {/* Stat tile row */}
+        <div className="col-span-12 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+          <StatTile label="Open tickets" value={String(totals.open)} />
+          <StatTile
+            label="Resolved · 30d"
+            value={String(totals.resolvedLast30d)}
+          />
+          <StatTile
+            label="Avg first response"
+            value={
+              totals.avgFirstResponseMinutes === null
+                ? "—"
+                : String(totals.avgFirstResponseMinutes)
+            }
+            unit={totals.avgFirstResponseMinutes === null ? undefined : "min"}
+          />
+          <StatTile
+            label="Avg resolution"
+            value={
+              totals.avgResolutionHours === null
+                ? "—"
+                : String(totals.avgResolutionHours)
+            }
+            unit={totals.avgResolutionHours === null ? undefined : "h"}
+          />
+          <StatTile
+            label="AI resolution rate"
+            value={String(Math.round(totals.aiResolutionRate * 100))}
+            unit="%"
+          />
+          <StatTile
+            label="Pending approvals"
+            value={String(totals.pendingApprovals)}
+            highlight={totals.pendingApprovals > 0}
+          />
+        </div>
+
+        {/* Ticket flow */}
+        <Card className="col-span-12 gap-4 px-5 py-5 xl:col-span-8">
+          <CardHeading>Ticket flow — last 30 days</CardHeading>
+          <FlowChart data={kpis.createdByDay} />
+        </Card>
+
+        {/* Open load by category */}
+        <Card className="col-span-12 gap-4 px-5 py-5 xl:col-span-4">
+          <CardHeading>Open load by category</CardHeading>
+          <CategoryBars data={kpis.byCategory} />
+        </Card>
+
+        {/* By priority */}
+        <Card className="col-span-12 gap-4 px-5 py-5 md:col-span-4">
+          <CardHeading>By priority</CardHeading>
+          <PriorityBars data={kpis.byPriority} />
+        </Card>
+
+        {/* AI vs human resolutions */}
+        <Card className="col-span-12 gap-4 px-5 py-5 md:col-span-5">
+          <CardHeading>AI vs human resolutions — 30d</CardHeading>
+          <AiVsHumanBar ai={aiResolved} human={humanResolved} />
+        </Card>
+
+        {/* Approvals mini-tile */}
+        <Card className="col-span-12 gap-2 px-5 py-5 md:col-span-3">
+          <CardHeading>Approvals</CardHeading>
+          <ApprovalsTile
+            approved={approvalStats.approved}
+            rejected={approvalStats.rejected}
+            pending={approvalStats.pending}
+          />
+        </Card>
+      </div>
+    </>
+  );
+}
