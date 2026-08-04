@@ -71,14 +71,19 @@ The container creates and seeds its SQLite databases on a named volume (`/data`)
 
 Servo ships in **mock mode** by default: a deterministic provider that scripts realistic tool-using conversations from the ticket text, so triage, resolution, approvals, and QA all work with no API key and no network access.
 
-To use a real model, either:
+For real model calls Servo speaks **two provider dialects**, configurable in **Settings → AI provider** (with quick-fill presets and a **Test connection** button):
 
-- open **Settings → AI provider**, choose `anthropic`, and paste your API key; or
-- set the `ANTHROPIC_API_KEY` environment variable (the env key takes precedence over the one stored in Settings).
+| Provider kind | Works with | Env var | Example |
+|---|---|---|---|
+| `anthropic` | Anthropic API + Anthropic-compatible endpoints | `ANTHROPIC_API_KEY` | Z.AI GLM: base URL `https://api.z.ai/api/anthropic`, model `glm-5.2` |
+| `openai` | Any OpenAI-compatible Chat Completions endpoint | `OPENAI_API_KEY` | OpenAI (`gpt-5.1`), Azure OpenAI (`https://<resource>.openai.azure.com/openai/v1`), Z.AI (`https://api.z.ai/api/paas/v4`), vLLM, **Ollama keyless** (`http://localhost:11434/v1`) |
 
-The optional **Base URL** setting points Servo at any Anthropic-compatible endpoint. For example, Z.AI's GLM models work as a drop-in: base URL `https://api.z.ai/api/anthropic`, model `glm-5.2`, and your Z.AI key as the API key.
+Notes:
 
-If the provider is set to `anthropic` but no key is found anywhere, Servo silently falls back to mock mode so the app never breaks.
+- The env var for the selected provider always takes precedence over a key stored in Settings.
+- `openai` endpoints with a **base URL but no key** are allowed — that is how keyless local servers like Ollama work.
+- If the selected provider has no usable credentials, Servo falls back to mock mode (Settings shows a warning) so the app never breaks.
+- The agent loop, approval gates, and QA are provider-agnostic: tool use is translated to Anthropic `tool_use` blocks or OpenAI function `tool_calls` automatically.
 
 > **POC caveat:** a key saved through Settings is stored **in plain text in the local SQLite database**. Fine for a local demo; do not do this with a production key on a shared machine. Prefer the environment variable.
 

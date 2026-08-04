@@ -194,7 +194,14 @@ Anthropic-Messages shape (`ConversationMessage[]` from `src/lib/types.ts`),
 and tool specs, returning text plus zero or more tool calls.
 
 - **AnthropicProvider** wraps `@anthropic-ai/sdk` `messages.create` with the
-  configured model, key, and optional base URL.
+  configured model, key, and optional base URL (covers the Anthropic API and
+  Anthropic-compatible endpoints such as Z.AI).
+- **OpenAiCompatibleProvider** speaks the Chat Completions dialect over plain
+  `fetch` (OpenAI, Azure OpenAI v1, Z.AI, vLLM, keyless local Ollama…). It
+  translates our Anthropic-shaped conversation to chat messages —
+  `tool_use` blocks become function `tool_calls`, `tool_result` blocks
+  become `role: "tool"` messages — and back, so the engine is
+  provider-agnostic.
 - **MockProvider** (`mock.ts`) is fully deterministic and offline. It derives
   a plausible tool script from the ticket text via keyword matching
   (password → `reset_password`, asset tags → `get_device_info`,
@@ -204,9 +211,13 @@ and tool specs, returning text plus zero or more tool calls.
   pause/resume/rejection machinery behaves identically with or without a key.
 
 Provider selection (`src/lib/ai/settings.ts`): the `ai.provider` setting picks
-anthropic or mock; if anthropic is selected but no key exists in either the
-environment (`ANTHROPIC_API_KEY`, which wins) or the Settings table, the
-engine falls back to mock so the app keeps working.
+`anthropic`, `openai`, or `mock`. The provider-matching env var
+(`ANTHROPIC_API_KEY` / `OPENAI_API_KEY`) always beats the key stored in
+Settings. A non-mock provider is *usable* with a key, or — for `openai`
+only — with just a base URL (keyless local endpoints). When the selected
+provider is not usable the engine falls back to mock and Settings shows a
+warning. `POST /api/settings/test` fires a real one-shot completion (never
+the mock) so admins can verify a configuration before saving it.
 
 ## From POC to a real deployment
 

@@ -1,7 +1,8 @@
 import { Lock } from "lucide-react";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { SETTING_KEYS, type RiskLevel } from "@/lib/types";
+import { getAiSettings } from "@/lib/ai/settings";
+import type { RiskLevel } from "@/lib/types";
 import PageHeader from "@/components/shell/PageHeader";
 import {
   Card,
@@ -51,29 +52,21 @@ export default async function SettingsPage() {
     );
   }
 
-  const [settingRows, toolPolicies, users] = await Promise.all([
-    db.setting.findMany(),
+  const [ai, toolPolicies, users] = await Promise.all([
+    getAiSettings(),
     db.toolPolicy.findMany({ orderBy: { toolName: "asc" } }),
     db.user.findMany({ orderBy: { createdAt: "asc" } }),
   ]);
 
-  const settings = Object.fromEntries(settingRows.map((s) => [s.key, s.value]));
-  const envKey = Boolean(process.env.ANTHROPIC_API_KEY);
-  const dbKey = Boolean(settings[SETTING_KEYS.apiKey]);
-  const keySource: AiSettingsView["keySource"] = envKey
-    ? "env"
-    : dbKey
-      ? "db"
-      : "none";
-
   const aiSettings: AiSettingsView = {
-    provider: settings[SETTING_KEYS.provider] ?? "mock",
-    baseUrl: settings[SETTING_KEYS.baseUrl] ?? "",
-    model: settings[SETTING_KEYS.model] ?? "claude-opus-5",
-    autoTriage: (settings[SETTING_KEYS.autoTriage] ?? "true") === "true",
-    qaEnabled: (settings[SETTING_KEYS.qaEnabled] ?? "true") === "true",
-    apiKeySet: envKey || dbKey,
-    keySource,
+    provider: ai.configuredProvider,
+    baseUrl: ai.baseUrl ?? "",
+    model: ai.model,
+    autoTriage: ai.autoTriage,
+    qaEnabled: ai.qaEnabled,
+    apiKeySet: ai.apiKey.length > 0,
+    keySource: ai.keySource,
+    fallingBackToMock: ai.configuredProvider !== "mock" && ai.provider === "mock",
   };
 
   const policyViews: ToolPolicyView[] = toolPolicies.map((p) => ({
