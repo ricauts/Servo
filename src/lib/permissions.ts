@@ -5,7 +5,10 @@ export type Action =
   | "ticket.create"
   | "ticket.update"
   | "ticket.assign"
+  | "ticket.escalate"
   | "ticket.comment"
+  | "group.view"
+  | "group.manage"
   | "agent.run"
   | "approval.view"
   | "approval.decide"
@@ -16,7 +19,10 @@ const MATRIX: Record<Action, Role[]> = {
   "ticket.create": ["ADMIN", "AGENT", "REQUESTER"],
   "ticket.update": ["ADMIN", "AGENT"],
   "ticket.assign": ["ADMIN", "AGENT"],
+  "ticket.escalate": ["ADMIN", "AGENT"],
   "ticket.comment": ["ADMIN", "AGENT", "REQUESTER"],
+  "group.view": ["ADMIN", "AGENT"],
+  "group.manage": ["ADMIN"],
   "agent.run": ["ADMIN", "AGENT"],
   "approval.view": ["ADMIN", "AGENT"],
   "approval.decide": ["ADMIN", "AGENT"],

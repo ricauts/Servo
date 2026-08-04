@@ -26,6 +26,10 @@ export type Category =
 
 export type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
 
+/** Escalation tiers within a group, lowest to highest. */
+export type Seniority = "JUNIOR" | "MID" | "SENIOR";
+export const SENIORITIES: Seniority[] = ["JUNIOR", "MID", "SENIOR"];
+
 export type RunStatus = "RUNNING" | "WAITING_APPROVAL" | "COMPLETED" | "FAILED";
 export type RunKind = "TRIAGE" | "RESOLVE";
 export type StepType =

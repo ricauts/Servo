@@ -15,6 +15,11 @@ import type {
   StepType,
 } from "@/lib/types";
 import { CATEGORIES, PRIORITIES } from "@/lib/types";
+import {
+  groupForCategory,
+  minSeniorityFor,
+  pickGroupAssignee,
+} from "@/lib/escalation";
 import { qaPrompt, qaSystem, resolverSystem, triageSystem, triageUser } from "./prompts";
 import { getProvider, type ChatProvider, type ToolSpec } from "./provider";
 import { getAiSettings, type AiSettings } from "./settings";
@@ -217,13 +222,24 @@ export async function runTriage(ticketId: string): Promise<AgentRun> {
         : "Classified automatically.";
 
     const resolverAgent = assignTo === "AI" ? await getAiUser("RESOLVER") : null;
+    // Route to the group that owns this category; priority sets the tier.
+    const group = await groupForCategory(category);
+    const level = minSeniorityFor(priority);
+    const humanAssignee =
+      !resolverAgent && group ? await pickGroupAssignee(group.id, level) : null;
     await db.ticket.update({
       where: { id: ticketId },
       data: {
         category,
         priority,
         status: "TRIAGED",
-        ...(resolverAgent ? { assigneeId: resolverAgent.id } : {}),
+        ...(group ? { groupId: group.id } : {}),
+        escalationLevel: level,
+        ...(resolverAgent
+          ? { assigneeId: resolverAgent.id }
+          : humanAssignee
+            ? { assigneeId: humanAssignee.id }
+            : {}),
       },
     });
     await db.comment.create({
@@ -603,10 +619,21 @@ async function runQaReview(ctx: LoopContext): Promise<void> {
     });
 
     if (verdict === "FAIL") {
-      const humanAgent = await db.user.findFirst({
-        where: { role: "AGENT" },
-        orderBy: { createdAt: "asc" },
+      // Prefer a member of the ticket's group at its escalation tier; fall
+      // back to any human agent so the ticket never dead-ends.
+      const ticketRow = await db.ticket.findUnique({
+        where: { id: ctx.ticket.id },
+        select: { groupId: true, escalationLevel: true },
       });
+      const groupPick = ticketRow?.groupId
+        ? await pickGroupAssignee(ticketRow.groupId, ticketRow.escalationLevel)
+        : null;
+      const humanAgent =
+        groupPick ??
+        (await db.user.findFirst({
+          where: { role: "AGENT" },
+          orderBy: { createdAt: "asc" },
+        }));
       await db.ticket.update({
         where: { id: ctx.ticket.id },
         data: {

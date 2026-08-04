@@ -7,6 +7,7 @@ import type {
   Priority,
   RiskLevel,
   RunStatus,
+  Seniority,
   TicketStatus,
 } from "@/lib/types";
 
@@ -59,6 +60,18 @@ export const CATEGORY_LABEL: Record<Category, string> = {
   DEVOPS: "DevOps & cloud",
   NETWORK: "Network",
   OTHER: "Other",
+};
+
+export const SENIORITY_LABEL: Record<Seniority, string> = {
+  JUNIOR: "Junior",
+  MID: "Mid",
+  SENIOR: "Senior",
+};
+
+export const SENIORITY_TONE: Record<Seniority, BadgeTone> = {
+  JUNIOR: "neutral",
+  MID: "violet",
+  SENIOR: "serious",
 };
 
 export const RISK_LABEL: Record<RiskLevel, string> = {

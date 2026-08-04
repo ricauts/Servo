@@ -1,0 +1,495 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Plus, Trash2, UserPlus, Users2 } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import Avatar from "@/components/legacy/Avatar";
+import Badge from "@/components/legacy/Badge";
+import EmptyState from "@/components/legacy/EmptyState";
+import { cn } from "@/lib/utils";
+import { CATEGORIES, SENIORITIES } from "@/lib/types";
+import type { Category, Seniority } from "@/lib/types";
+import { CATEGORY_LABEL, SENIORITY_LABEL, SENIORITY_TONE } from "@/lib/labels";
+
+export interface GroupView {
+  id: string;
+  name: string;
+  description: string;
+  categories: string[];
+  openTickets: number;
+  members: {
+    userId: string;
+    name: string;
+    color: string;
+    seniority: string;
+  }[];
+}
+
+export interface MemberOption {
+  id: string;
+  name: string;
+  color: string;
+  role: string;
+}
+
+async function api(
+  path: string,
+  method: string,
+  body?: unknown,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(path, {
+      method,
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (res.ok) return { ok: true };
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    return { ok: false, error: data.error ?? `Request failed (${res.status}).` };
+  } catch {
+    return { ok: false, error: "Network error — nothing was changed." };
+  }
+}
+
+function CategoryToggles({
+  selected,
+  onToggle,
+  disabled,
+}: {
+  selected: string[];
+  onToggle: (c: Category) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {CATEGORIES.map((c) => {
+        const active = selected.includes(c);
+        return (
+          <button
+            key={c}
+            type="button"
+            disabled={disabled}
+            onClick={() => onToggle(c)}
+            className={cn(
+              "rounded-full border px-2.5 py-0.5 font-mono text-[10.5px] uppercase tracking-wide transition-colors",
+              active
+                ? "border-transparent bg-primary/15 text-primary-strong"
+                : "border-border text-muted-foreground hover:border-primary/40",
+              disabled && "cursor-default opacity-70 hover:border-border",
+            )}
+          >
+            {CATEGORY_LABEL[c]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function GroupCard({
+  group,
+  users,
+  canManage,
+}: {
+  group: GroupView;
+  users: MemberOption[];
+  canManage: boolean;
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [addUserId, setAddUserId] = useState("");
+  const [addSeniority, setAddSeniority] = useState<string>("JUNIOR");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const memberIds = new Set(group.members.map((m) => m.userId));
+  const addable = users.filter((u) => !memberIds.has(u.id));
+
+  async function patchMembers(
+    members: { userId: string; seniority: string }[],
+  ) {
+    setBusy(true);
+    setError(null);
+    const res = await api(`/api/groups/${group.id}`, "PATCH", { members });
+    if (!res.ok) setError(res.error ?? null);
+    else router.refresh();
+    setBusy(false);
+  }
+
+  async function toggleCategory(c: Category) {
+    setBusy(true);
+    setError(null);
+    const next = group.categories.includes(c)
+      ? group.categories.filter((x) => x !== c)
+      : [...group.categories, c];
+    const res = await api(`/api/groups/${group.id}`, "PATCH", {
+      categories: next,
+    });
+    if (!res.ok) setError(res.error ?? null);
+    else router.refresh();
+    setBusy(false);
+  }
+
+  async function removeGroup() {
+    setBusy(true);
+    setError(null);
+    const res = await api(`/api/groups/${group.id}`, "DELETE");
+    if (!res.ok) {
+      setError(res.error ?? null);
+      setBusy(false);
+    } else {
+      router.refresh();
+    }
+  }
+
+  return (
+    <Card size="sm" className="flex flex-col">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          {group.name}
+          <Badge tone="neutral">{group.openTickets} open</Badge>
+        </CardTitle>
+        {group.description && (
+          <CardDescription>{group.description}</CardDescription>
+        )}
+      </CardHeader>
+      <CardContent className="flex flex-1 flex-col gap-4 font-sans">
+        <div className="flex flex-col gap-1.5">
+          <span className="font-heading text-xs text-muted-foreground">
+            Routed categories
+          </span>
+          <CategoryToggles
+            selected={group.categories}
+            onToggle={toggleCategory}
+            disabled={!canManage || busy}
+          />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <span className="font-heading text-xs text-muted-foreground">
+            Members ({group.members.length})
+          </span>
+          {group.members.length === 0 && (
+            <p className="text-[13px] text-muted-foreground">
+              No members yet — tickets routed here stay unassigned.
+            </p>
+          )}
+          {group.members.map((m) => (
+            <div key={m.userId} className="flex items-center gap-2.5">
+              <Avatar name={m.name} color={m.color} size={24} />
+              <span className="min-w-0 flex-1 truncate text-[13px]">
+                {m.name}
+              </span>
+              {canManage ? (
+                <Select
+                  value={m.seniority}
+                  disabled={busy}
+                  onValueChange={(value) =>
+                    void patchMembers(
+                      group.members.map((x) =>
+                        x.userId === m.userId
+                          ? { userId: x.userId, seniority: value }
+                          : { userId: x.userId, seniority: x.seniority },
+                      ),
+                    )
+                  }
+                >
+                  <SelectTrigger size="sm" className="w-28">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SENIORITIES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {SENIORITY_LABEL[s]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Badge tone={SENIORITY_TONE[m.seniority as Seniority] ?? "neutral"}>
+                  {SENIORITY_LABEL[m.seniority as Seniority] ?? m.seniority}
+                </Badge>
+              )}
+              {canManage && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Remove ${m.name}`}
+                  disabled={busy}
+                  onClick={() =>
+                    void patchMembers(
+                      group.members
+                        .filter((x) => x.userId !== m.userId)
+                        .map((x) => ({ userId: x.userId, seniority: x.seniority })),
+                    )
+                  }
+                >
+                  <Trash2 size={14} />
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {canManage && (
+          <div className="mt-auto flex flex-col gap-2 border-t border-border pt-3">
+            <div className="flex items-center gap-2">
+              <Select value={addUserId} onValueChange={setAddUserId}>
+                <SelectTrigger size="sm" className="min-w-0 flex-1">
+                  <SelectValue placeholder="Add a member" />
+                </SelectTrigger>
+                <SelectContent>
+                  {addable.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={addSeniority} onValueChange={setAddSeniority}>
+                <SelectTrigger size="sm" className="w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SENIORITIES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {SENIORITY_LABEL[s]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                aria-label="Add member"
+                disabled={busy || !addUserId}
+                onClick={() => {
+                  void patchMembers([
+                    ...group.members.map((x) => ({
+                      userId: x.userId,
+                      seniority: x.seniority,
+                    })),
+                    { userId: addUserId, seniority: addSeniority },
+                  ]);
+                  setAddUserId("");
+                }}
+              >
+                <UserPlus size={14} />
+              </Button>
+            </div>
+
+            {confirmDelete ? (
+              <div className="flex items-center gap-2">
+                <span className="flex-1 text-[13px] text-muted-foreground">
+                  Delete this group? Its tickets keep working, ungrouped.
+                </span>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => void removeGroup()}
+                >
+                  Delete
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmDelete(false)}
+                >
+                  Keep
+                </Button>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="self-start text-muted-foreground hover:text-destructive"
+                onClick={() => setConfirmDelete(true)}
+              >
+                <Trash2 size={14} />
+                Delete group
+              </Button>
+            )}
+          </div>
+        )}
+
+        {error && <p className="text-[13px] text-critical">{error}</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
+function CreateGroupDialog() {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [categories, setCategories] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    setBusy(true);
+    setError(null);
+    const res = await api("/api/groups", "POST", {
+      name,
+      description,
+      categories,
+    });
+    if (!res.ok) {
+      setError(res.error ?? null);
+      setBusy(false);
+      return;
+    }
+    setOpen(false);
+    setName("");
+    setDescription("");
+    setCategories([]);
+    setBusy(false);
+    router.refresh();
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button>
+          <Plus size={15} />
+          New group
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Create group</DialogTitle>
+          <DialogDescription>
+            Groups own ticket categories; triage routes matching tickets to the
+            group automatically.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="group-name" className="text-xs">
+              Name
+            </Label>
+            <Input
+              id="group-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Development"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="group-description" className="text-xs">
+              Description
+            </Label>
+            <Textarea
+              id="group-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What does this team own?"
+              rows={2}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs">Routed categories</Label>
+            <CategoryToggles
+              selected={categories}
+              onToggle={(c) =>
+                setCategories((prev) =>
+                  prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c],
+                )
+              }
+            />
+          </div>
+          {error && <p className="text-[13px] text-critical">{error}</p>}
+        </div>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setOpen(false)}
+            disabled={busy}
+          >
+            Cancel
+          </Button>
+          <Button type="button" onClick={submit} disabled={busy || !name.trim()}>
+            Create
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default function GroupsManager({
+  groups,
+  users,
+  canManage,
+}: {
+  groups: GroupView[];
+  users: MemberOption[];
+  canManage: boolean;
+}) {
+  return (
+    <div className="space-y-4">
+      {canManage && (
+        <div className="flex justify-end">
+          <CreateGroupDialog />
+        </div>
+      )}
+      {groups.length === 0 ? (
+        <EmptyState
+          icon={Users2}
+          title="No groups yet"
+          hint={
+            canManage
+              ? "Create a group and pick which ticket categories it owns."
+              : "An admin needs to create the first group."
+          }
+        />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {groups.map((g) => (
+            <GroupCard
+              key={g.id}
+              group={g}
+              users={users}
+              canManage={canManage}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

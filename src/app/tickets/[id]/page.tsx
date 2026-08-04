@@ -2,9 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { db } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 import Avatar from "@/components/legacy/Avatar";
 import Badge from "@/components/legacy/Badge";
 import Timeline from "@/components/tickets/Timeline";
+import EscalatePanel from "@/components/tickets/EscalatePanel";
 import PendingApprovalCard from "@/components/tickets/PendingApprovalCard";
 import PropertiesPanel from "@/components/tickets/PropertiesPanel";
 import RelativeTime from "@/components/tickets/RelativeTime";
@@ -37,6 +40,7 @@ export default async function TicketDetailPage({
     include: {
       requester: true,
       assignee: true,
+      group: true,
       comments: {
         include: { author: true },
         orderBy: { createdAt: "asc" },
@@ -56,6 +60,7 @@ export default async function TicketDetailPage({
   });
   if (!ticket) notFound();
 
+  const currentUser = await getCurrentUser();
   const aiUsers = await db.user.findMany({ where: { role: "AI_AGENT" } });
   const agents = Object.fromEntries(aiUsers.map((u) => [u.id, u]));
 
@@ -94,6 +99,7 @@ export default async function TicketDetailPage({
           <Badge tone="neutral">
             {CATEGORY_LABEL[ticket.category as Category] ?? ticket.category}
           </Badge>
+          {ticket.group && <Badge tone="brand">{ticket.group.name}</Badge>}
           <span className="ml-1 flex items-center gap-1.5">
             <Avatar
               name={ticket.requester.name}
@@ -144,6 +150,16 @@ export default async function TicketDetailPage({
             assigneeId={ticket.assigneeId}
             assigneeName={ticket.assignee?.name ?? null}
           />
+
+          {can(currentUser, "ticket.escalate") && (
+            <EscalatePanel
+              ticketId={ticket.id}
+              groupId={ticket.groupId}
+              groupName={ticket.group?.name ?? null}
+              escalationLevel={ticket.escalationLevel}
+              closed={ticket.status === "RESOLVED" || ticket.status === "CLOSED"}
+            />
+          )}
 
           <RunResolverCard ticketId={ticket.id} hasActiveRun={hasActiveRun} />
 

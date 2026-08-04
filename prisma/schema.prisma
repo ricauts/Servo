@@ -19,10 +19,33 @@ model User {
   color     String   @default("#165A56")
   createdAt DateTime @default(now())
 
-  requestedTickets Ticket[]   @relation("requester")
-  assignedTickets  Ticket[]   @relation("assignee")
+  requestedTickets Ticket[]      @relation("requester")
+  assignedTickets  Ticket[]      @relation("assignee")
   comments         Comment[]
-  decisions        Approval[] @relation("decider")
+  decisions        Approval[]    @relation("decider")
+  memberships      GroupMember[]
+}
+
+model Group {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String   @default("")
+  categories  String   @default("[]") // JSON: Category[] whose tickets route to this group
+  createdAt   DateTime @default(now())
+
+  members GroupMember[]
+  tickets Ticket[]
+}
+
+model GroupMember {
+  id        String @id @default(cuid())
+  groupId   String
+  group     Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  seniority String @default("JUNIOR") // JUNIOR | MID | SENIOR
+
+  @@unique([groupId, userId])
 }
 
 model Ticket {
@@ -37,6 +60,9 @@ model Ticket {
   requester       User      @relation("requester", fields: [requesterId], references: [id])
   assigneeId      String?
   assignee        User?     @relation("assignee", fields: [assigneeId], references: [id])
+  groupId         String?
+  group           Group?    @relation(fields: [groupId], references: [id])
+  escalationLevel String    @default("JUNIOR") // JUNIOR | MID | SENIOR — current handling tier
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   firstResponseAt DateTime?

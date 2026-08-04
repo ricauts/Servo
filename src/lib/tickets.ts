@@ -13,16 +13,24 @@ export const userSummarySelect = {
   role: true,
 } as const;
 
+/** Compact group shape embedded in ticket payloads. */
+export const groupSummarySelect = {
+  id: true,
+  name: true,
+} as const;
+
 /** Include for `GET /api/tickets` list items. */
 export const ticketListInclude = {
   requester: { select: userSummarySelect },
   assignee: { select: userSummarySelect },
+  group: { select: groupSummarySelect },
 } as const;
 
 /** Include for `GET /api/tickets/[id]` detail payloads. */
 export const ticketDetailInclude = {
   requester: { select: userSummarySelect },
   assignee: { select: userSummarySelect },
+  group: { select: groupSummarySelect },
   comments: {
     include: { author: true },
     orderBy: { createdAt: "asc" },

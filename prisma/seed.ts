@@ -34,6 +34,8 @@ async function main() {
   await db.agentRun.deleteMany();
   await db.comment.deleteMany();
   await db.ticket.deleteMany();
+  await db.groupMember.deleteMany();
+  await db.group.deleteMany();
   await db.toolPolicy.deleteMany();
   await db.setting.deleteMany();
   await db.user.deleteMany();
@@ -53,6 +55,38 @@ async function main() {
       email: "bruno@acme.dev",
       role: "AGENT",
       color: "#1C5CAB",
+    },
+  });
+  const elena = await db.user.create({
+    data: {
+      name: "Elena Duarte",
+      email: "elena@acme.dev",
+      role: "AGENT",
+      color: "#7A2E8D",
+    },
+  });
+  const farid = await db.user.create({
+    data: {
+      name: "Farid Khan",
+      email: "farid@acme.dev",
+      role: "AGENT",
+      color: "#0F6E3F",
+    },
+  });
+  const gabriela = await db.user.create({
+    data: {
+      name: "Gabriela Torres",
+      email: "gabriela@acme.dev",
+      role: "AGENT",
+      color: "#A33B4F",
+    },
+  });
+  const hiro = await db.user.create({
+    data: {
+      name: "Hiro Tanaka",
+      email: "hiro@acme.dev",
+      role: "AGENT",
+      color: "#31567F",
     },
   });
   const carla = await db.user.create({
@@ -96,6 +130,49 @@ async function main() {
       role: "AI_AGENT",
       aiKind: "QA",
       color: "#52514E",
+    },
+  });
+
+  // -- groups (assignment + escalation hierarchy) ---------------------------
+  const devGroup = await db.group.create({
+    data: {
+      name: "Development",
+      description: "Application software, internal tooling and deployments.",
+      categories: JSON.stringify(["SOFTWARE", "DEVOPS"]),
+      members: {
+        create: [
+          { userId: elena.id, seniority: "SENIOR" },
+          { userId: farid.id, seniority: "MID" },
+          { userId: gabriela.id, seniority: "JUNIOR" },
+        ],
+      },
+    },
+  });
+  const analyticsGroup = await db.group.create({
+    data: {
+      name: "Analytics",
+      description: "Databases, BI dashboards and data quality.",
+      categories: JSON.stringify(["DATABASE"]),
+      members: {
+        create: [
+          { userId: hiro.id, seniority: "SENIOR" },
+          { userId: farid.id, seniority: "JUNIOR" },
+        ],
+      },
+    },
+  });
+  const engGroup = await db.group.create({
+    data: {
+      name: "Engineering",
+      description: "Devices, network, access and physical infrastructure.",
+      categories: JSON.stringify(["HARDWARE", "NETWORK", "ACCESS"]),
+      members: {
+        create: [
+          { userId: bruno.id, seniority: "SENIOR" },
+          { userId: elena.id, seniority: "MID" },
+          { userId: gabriela.id, seniority: "JUNIOR" },
+        ],
+      },
     },
   });
 
@@ -760,8 +837,34 @@ async function main() {
     }
   }
 
+  // ---- group routing backfill (category → owning group; priority → tier) ----
+  const groupByCategory: Record<string, string> = {
+    SOFTWARE: devGroup.id,
+    DEVOPS: devGroup.id,
+    DATABASE: analyticsGroup.id,
+    HARDWARE: engGroup.id,
+    NETWORK: engGroup.id,
+    ACCESS: engGroup.id,
+  };
+  const tierFor = (p: string) =>
+    p === "URGENT" ? "SENIOR" : p === "HIGH" ? "MID" : "JUNIOR";
+  const allTickets = await db.ticket.findMany({
+    select: { id: true, category: true, priority: true },
+  });
+  for (const t of allTickets) {
+    const groupId = groupByCategory[t.category];
+    await db.ticket.update({
+      where: { id: t.id },
+      data: {
+        ...(groupId ? { groupId } : {}),
+        escalationLevel: tierFor(t.priority),
+      },
+    });
+  }
+
   const counts = {
     users: await db.user.count(),
+    groups: await db.group.count(),
     tickets: await db.ticket.count(),
     runs: await db.agentRun.count(),
     approvals: await db.approval.count(),

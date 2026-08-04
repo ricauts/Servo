@@ -22,10 +22,12 @@ interface SwitcherUser {
 
 export default function MobileTopbar({
   counts,
+  showGroups = false,
   users,
   currentUserId,
 }: {
   counts: { tickets: number; approvals: number };
+  showGroups?: boolean;
   users: SwitcherUser[];
   currentUserId: string;
 }) {
@@ -52,7 +54,11 @@ export default function MobileTopbar({
               Servo<span className="text-primary">.</span>
             </SheetTitle>
           </SheetHeader>
-          <SidebarNav counts={counts} onNavigate={() => setOpen(false)} />
+          <SidebarNav
+            counts={counts}
+            showGroups={showGroups}
+            onNavigate={() => setOpen(false)}
+          />
           <div className="mt-auto border-t border-sidebar-border p-3">
             <UserSwitcher users={users} currentUserId={currentUserId} />
           </div>

@@ -33,8 +33,18 @@ values like `TicketStatus`, `Priority`, `RiskLevel`, and `RunStatus`.
   (`OPEN → TRIAGED → IN_PROGRESS → WAITING_APPROVAL → RESOLVED → CLOSED`),
   priority, category, requester, optional assignee, plus `firstResponseAt`
   and `resolvedAt` timestamps that feed the KPIs.
+- **Group** / **GroupMember** — assignment groups (e.g. Development,
+  Analytics, Engineering). A group owns a set of ticket categories
+  (`categories` JSON) that triage routes to it; each membership carries a
+  per-group `seniority` (`JUNIOR` / `MID` / `SENIOR`). Tickets store the
+  owning `groupId` and their current `escalationLevel`. Priority sets the
+  minimum tier (`LOW`/`MEDIUM` → JUNIOR, `HIGH` → MID, `URGENT` → SENIOR —
+  see `src/lib/escalation-rules.ts`), and `POST
+  /api/tickets/[id]/escalate` raises the tier within the group or hands the
+  ticket to another group, reassigning to the least-loaded eligible member
+  and logging a `SYSTEM` comment.
 - **Comment** — `COMMENT` (a person or agent speaking) or `SYSTEM`
-  (triage rationale, QA flags, rejection notices).
+  (triage rationale, QA flags, escalation notices, rejection notices).
 - **AgentRun** — one execution of an agent on a ticket (`TRIAGE` or
   `RESOLVE`). Holds status, a summary, an optional error, QA verdict/notes,
   and crucially the full provider **conversation as JSON** — that persisted

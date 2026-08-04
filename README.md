@@ -23,7 +23,8 @@ Bring your own Anthropic API key for real model calls — or run entirely offlin
 - **Automated QA review** — after a run that executed medium/high-risk tools, a QA agent reviews the transcript and issues a PASS/FAIL verdict; failures reassign the ticket to a human with an explanatory comment.
 - **KPI dashboard** — open tickets, resolution times, first-response times, AI-vs-human resolution split, approval stats, ticket volume over 30 days.
 - **BYOK with offline mock mode** — plug in an Anthropic API key via Settings or environment variable, or run fully offline with the deterministic mock provider.
-- **Role-based permissions** — ADMIN, AGENT, and REQUESTER roles with a permission matrix; HIGH-risk approvals are admin-only.
+- **Groups & escalation hierarchy** — assignment groups (Development, Analytics, Engineering…) own ticket categories; members carry JUNIOR → MID → SENIOR tiers per group. Priority sets the minimum tier, and any agent can escalate a ticket up a tier or across to another group — the least-loaded eligible member picks it up and the move is logged on the timeline.
+- **Role-based permissions** — ADMIN, AGENT, and REQUESTER roles with a permission matrix; HIGH-risk approvals and group management are admin-only.
 - **Demo user switcher** — hop between seeded users to experience every role without an auth provider.
 - **shadcn/ui frontend** — Tailwind v4 + [shadcn/ui](https://ui.shadcn.com) components and charts (Recharts), themed with Servo's green-accent OKLCH palette; light mode by default with a dark-mode toggle.
 - **Docker-ready** — one `docker compose up --build` gives you a self-contained instance with persistent SQLite volumes.
@@ -86,8 +87,9 @@ The seed creates these users, switchable from the user switcher in the sidebar:
 
 | User | Role | What they can do |
 |---|---|---|
-| Ana Rodríguez | ADMIN | Everything, including Settings and HIGH-risk approvals |
-| Bruno Chen | AGENT | Work tickets, run the AI, decide LOW/MEDIUM-risk approvals |
+| Ana Rodríguez | ADMIN | Everything, including Settings, groups, and HIGH-risk approvals |
+| Bruno Chen | AGENT | Work tickets, run the AI, decide LOW/MEDIUM-risk approvals; SENIOR in Engineering |
+| Elena Duarte, Farid Khan, Gabriela Torres, Hiro Tanaka | AGENT | Group members across Development / Analytics / Engineering at junior→senior tiers |
 | Carla Méndez | REQUESTER | Create tickets, comment |
 | Diego Fontaine | REQUESTER | Create tickets, comment |
 | Servo Triage / Resolver / QA | AI_AGENT | The three AI agents (not switchable personas — they act via runs) |
@@ -113,12 +115,14 @@ src/
     tickets/           # ticket list, new ticket, ticket detail
     dashboard/         # KPI dashboard
     approvals/         # approvals inbox
+    groups/            # assignment groups + escalation tiers
     settings/          # BYOK + tool policies (admin only)
   lib/
     ai/                # provider abstraction, mock provider, tools, prompts, engine
     db.ts / opsdb.ts   # app DB and sandboxed ops DB clients
     auth.ts            # cookie-based demo auth
     permissions.ts     # role/action matrix + approval risk rules
+    escalation*.ts     # group routing + seniority tier rules
     types.ts           # shared unions and payload shapes (source of truth)
   components/          # UI primitives, shell, and feature components
 docs/
@@ -132,7 +136,7 @@ docs/
 - Email intake and notifications (create tickets from a mailbox, reply-to-comment)
 - OpenAI-compatible providers alongside Anthropic (Anthropic-compatible endpoints like Z.AI already work via the Base URL setting)
 - SSO and real RBAC (the current roles/permissions are a demo matrix)
-- SLA tracking and escalation policies
+- SLA tracking and time-based auto-escalation (manual tier/group escalation already works)
 - Webhooks and an events API
 - Email/Slack notifications
 

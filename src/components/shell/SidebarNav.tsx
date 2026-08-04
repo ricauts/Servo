@@ -7,6 +7,7 @@ import {
   Inbox,
   ShieldCheck,
   Settings2,
+  Users2,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -21,9 +22,12 @@ interface NavItem {
 
 export default function SidebarNav({
   counts,
+  showGroups = false,
   onNavigate,
 }: {
   counts: { tickets: number; approvals: number };
+  /** Groups is only visible to roles with the group.view permission. */
+  showGroups?: boolean;
   /** Called when a nav link is clicked (used to close the mobile sheet). */
   onNavigate?: () => void;
 }) {
@@ -45,6 +49,9 @@ export default function SidebarNav({
       count: counts.approvals,
       countTone: "attention",
     },
+    ...(showGroups
+      ? [{ href: "/groups", label: "Groups", icon: Users2 } as NavItem]
+      : []),
     { href: "/settings", label: "Settings", icon: Settings2 },
   ];
 
