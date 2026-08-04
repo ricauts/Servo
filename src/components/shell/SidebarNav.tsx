@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Bot,
   LayoutDashboard,
   Inbox,
   ShieldCheck,
@@ -22,12 +23,12 @@ interface NavItem {
 
 export default function SidebarNav({
   counts,
-  showGroups = false,
+  showTeamNav = false,
   onNavigate,
 }: {
   counts: { tickets: number; approvals: number };
-  /** Groups is only visible to roles with the group.view permission. */
-  showGroups?: boolean;
+  /** Groups/Agents are only visible to admin and agent roles. */
+  showTeamNav?: boolean;
   /** Called when a nav link is clicked (used to close the mobile sheet). */
   onNavigate?: () => void;
 }) {
@@ -49,8 +50,11 @@ export default function SidebarNav({
       count: counts.approvals,
       countTone: "attention",
     },
-    ...(showGroups
-      ? [{ href: "/groups", label: "Groups", icon: Users2 } as NavItem]
+    ...(showTeamNav
+      ? [
+          { href: "/groups", label: "Groups", icon: Users2 } as NavItem,
+          { href: "/agents", label: "Agents", icon: Bot } as NavItem,
+        ]
       : []),
     { href: "/settings", label: "Settings", icon: Settings2 },
   ];

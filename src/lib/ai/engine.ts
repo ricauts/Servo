@@ -20,6 +20,7 @@ import {
   minSeniorityFor,
   pickGroupAssignee,
 } from "@/lib/escalation";
+import { pickAgentProfile, profileAllowsTool } from "@/lib/agent-profiles";
 import { qaPrompt, qaSystem, resolverSystem, triageSystem, triageUser } from "./prompts";
 import { getProvider, type ChatProvider, type ToolSpec } from "./provider";
 import { getAiSettings, type AiSettings } from "./settings";
@@ -169,15 +170,28 @@ async function buildLoopContext(
 ): Promise<LoopContext> {
   const settings = await getAiSettings();
   const enabledPolicies = await db.toolPolicy.findMany({ where: { enabled: true } });
+  // A specialized profile (pinned on the run at creation so resumes keep the
+  // same persona) narrows the tool set and extends the system prompt.
+  const runRow = await db.agentRun.findUnique({
+    where: { id: runId },
+    include: { profile: true },
+  });
+  const profile = runRow?.profile ?? null;
+  const activePolicies = enabledPolicies.filter((policy) =>
+    profileAllowsTool(profile, policy.toolName),
+  );
+  const system = profile
+    ? `${resolverSystem(activePolicies)}\n\n## Specialization: ${profile.name}\n\n${profile.systemPrompt}`
+    : resolverSystem(activePolicies);
   return {
     runId,
     ticket,
     agentUser,
     settings,
     provider: getProvider(settings, { ticket, kind: "RESOLVE" }),
-    system: resolverSystem(enabledPolicies),
-    toolSpecs: toolSpecsFor(enabledPolicies),
-    policies: new Map(enabledPolicies.map((policy) => [policy.toolName, policy])),
+    system,
+    toolSpecs: toolSpecsFor(activePolicies),
+    policies: new Map(activePolicies.map((policy) => [policy.toolName, policy])),
     messages,
     nextIndex,
   };
@@ -329,10 +343,13 @@ async function runResolverInner(ticketId: string): Promise<AgentRun> {
       ],
     },
   ];
+  // Pin the specialized profile (if any) on the run so resumes reuse it.
+  const profile = await pickAgentProfile(ticket.category);
   const run = await db.agentRun.create({
     data: {
       ticketId,
       agentUserId: resolverAgent.id,
+      profileId: profile?.id ?? null,
       kind: "RESOLVE",
       status: "RUNNING",
       conversation: JSON.stringify(messages),

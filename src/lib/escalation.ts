@@ -3,10 +3,11 @@
 
 import { db } from "@/lib/db";
 import type { Category, Seniority } from "@/lib/types";
-import { seniorityRank } from "@/lib/escalation-rules";
+import { memberEligibleFor, seniorityRank } from "@/lib/escalation-rules";
 
 export {
   canHandle,
+  memberEligibleFor,
   minSeniorityFor,
   nextLevel,
   seniorityRank,
@@ -27,9 +28,10 @@ export async function groupForCategory(category: Category | string) {
 }
 
 /**
- * Least-loaded human member of the group at (or above) the given tier.
- * Ties break toward the lowest sufficient seniority so seniors stay free
- * for the tickets only they can take.
+ * Least-loaded human member of the group eligible for the given tier
+ * (ladder members at/above it, plus STANDALONE specialists). Ties break
+ * toward the lowest sufficient ladder tier so seniors stay free for the
+ * tickets only they can take; standalone members come after the ladder.
  */
 export async function pickGroupAssignee(
   groupId: string,
@@ -54,15 +56,15 @@ export async function pickGroupAssignee(
       },
     },
   });
+  const tieRank = (tier: string) =>
+    tier === "STANDALONE" ? Number.MAX_SAFE_INTEGER : seniorityRank(tier);
   const eligible = members
     .filter(
-      (m) =>
-        m.user.role !== "AI_AGENT" &&
-        seniorityRank(m.seniority) >= seniorityRank(level),
+      (m) => m.user.role !== "AI_AGENT" && memberEligibleFor(m.seniority, level),
     )
     .sort((a, b) => {
       const load = a.user._count.assignedTickets - b.user._count.assignedTickets;
-      return load !== 0 ? load : seniorityRank(a.seniority) - seniorityRank(b.seniority);
+      return load !== 0 ? load : tieRank(a.seniority) - tieRank(b.seniority);
     });
   const user = eligible[0]?.user;
   return user ? { id: user.id, name: user.name } : null;

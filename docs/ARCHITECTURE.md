@@ -55,6 +55,14 @@ values like `TicketStatus`, `Priority`, `RiskLevel`, and `RunStatus`.
 - **Approval** — a pending/decided human decision on one tool call. Stores
   the tool name, its JSON input, the provider `toolUseId` (echoed back into
   the conversation on resume), risk level, decider, and reason.
+- **AgentProfile** — a specialized resolver persona stored as a Markdown
+  document (YAML frontmatter: `name`, `description`, `categories`, `tools`;
+  body = system prompt). Seeded from `agents/*.md`, editable from `/agents`
+  in the same format. `runResolver` pins the enabled profile covering the
+  ticket's category onto the run (`AgentRun.profileId`) so resumes keep the
+  same persona; the profile narrows the tool set (core `post_comment` /
+  `resolve_ticket` always allowed) and appends its specialization to the
+  resolver system prompt.
 - **ToolPolicy** — per-tool risk level, enabled flag, and
   `requiresApproval` flag. Editable at runtime from Settings.
 - **Setting** — key/value store for provider config

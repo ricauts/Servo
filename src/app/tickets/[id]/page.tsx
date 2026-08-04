@@ -49,6 +49,7 @@ export default async function TicketDetailPage({
         include: {
           steps: { orderBy: { index: "asc" } },
           approvals: { include: { decider: true } },
+          profile: { select: { name: true } },
         },
         orderBy: { createdAt: "asc" },
       },
@@ -172,7 +173,9 @@ export default async function TicketDetailPage({
                 <RunSummaryCard
                   key={run.id}
                   run={run}
-                  agentName={agents[run.agentUserId]?.name ?? "AI agent"}
+                  agentName={
+                    run.profile?.name ?? agents[run.agentUserId]?.name ?? "AI agent"
+                  }
                 />
               ))}
             </div>

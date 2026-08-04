@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { forbid } from "@/lib/permissions";
 import { groupInclude } from "@/lib/groups";
-import { CATEGORIES, SENIORITIES } from "@/lib/types";
+import { CATEGORIES, MEMBER_TIERS } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +19,7 @@ const patchSchema = z.object({
     .array(
       z.object({
         userId: z.string().min(1),
-        seniority: z.enum(SENIORITIES as [string, ...string[]]),
+        seniority: z.enum(MEMBER_TIERS as [string, ...string[]]),
       }),
     )
     .optional(),

@@ -22,7 +22,7 @@ export default async function Sidebar() {
     <>
       <MobileTopbar
         counts={{ tickets: openTickets, approvals: pendingApprovals }}
-        showGroups={can(user, "group.view")}
+        showTeamNav={can(user, "group.view")}
         users={users}
         currentUserId={user.id}
       />
@@ -41,7 +41,7 @@ export default async function Sidebar() {
 
       <SidebarNav
         counts={{ tickets: openTickets, approvals: pendingApprovals }}
-        showGroups={can(user, "group.view")}
+        showTeamNav={can(user, "group.view")}
       />
 
         <div className="mt-auto border-t border-sidebar-border p-3">

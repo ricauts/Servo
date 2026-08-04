@@ -30,6 +30,14 @@ export type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
 export type Seniority = "JUNIOR" | "MID" | "SENIOR";
 export const SENIORITIES: Seniority[] = ["JUNIOR", "MID", "SENIOR"];
 
+/**
+ * A membership is either on the JUNIOR→MID→SENIOR ladder or STANDALONE — a
+ * specialist outside the hierarchy who can take tickets at any tier but is
+ * never the target of tier escalation preference.
+ */
+export type MemberTier = Seniority | "STANDALONE";
+export const MEMBER_TIERS: MemberTier[] = [...SENIORITIES, "STANDALONE"];
+
 export type RunStatus = "RUNNING" | "WAITING_APPROVAL" | "COMPLETED" | "FAILED";
 export type RunKind = "TRIAGE" | "RESOLVE";
 export type StepType =

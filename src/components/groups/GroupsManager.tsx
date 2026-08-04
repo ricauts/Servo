@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -34,8 +34,8 @@ import Avatar from "@/components/legacy/Avatar";
 import Badge from "@/components/legacy/Badge";
 import EmptyState from "@/components/legacy/EmptyState";
 import { cn } from "@/lib/utils";
-import { CATEGORIES, SENIORITIES } from "@/lib/types";
-import type { Category, Seniority } from "@/lib/types";
+import { CATEGORIES, MEMBER_TIERS } from "@/lib/types";
+import type { Category, MemberTier } from "@/lib/types";
 import { CATEGORY_LABEL, SENIORITY_LABEL, SENIORITY_TONE } from "@/lib/labels";
 
 export interface GroupView {
@@ -225,7 +225,7 @@ function GroupCard({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {SENIORITIES.map((s) => (
+                    {MEMBER_TIERS.map((s) => (
                       <SelectItem key={s} value={s}>
                         {SENIORITY_LABEL[s]}
                       </SelectItem>
@@ -233,8 +233,8 @@ function GroupCard({
                   </SelectContent>
                 </Select>
               ) : (
-                <Badge tone={SENIORITY_TONE[m.seniority as Seniority] ?? "neutral"}>
-                  {SENIORITY_LABEL[m.seniority as Seniority] ?? m.seniority}
+                <Badge tone={SENIORITY_TONE[m.seniority as MemberTier] ?? "neutral"}>
+                  {SENIORITY_LABEL[m.seniority as MemberTier] ?? m.seniority}
                 </Badge>
               )}
               {canManage && (
@@ -279,7 +279,7 @@ function GroupCard({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {SENIORITIES.map((s) => (
+                  {MEMBER_TIERS.map((s) => (
                     <SelectItem key={s} value={s}>
                       {SENIORITY_LABEL[s]}
                     </SelectItem>

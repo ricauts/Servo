@@ -43,7 +43,7 @@ model GroupMember {
   group     Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
   userId    String
   user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  seniority String @default("JUNIOR") // JUNIOR | MID | SENIOR
+  seniority String @default("JUNIOR") // JUNIOR | MID | SENIOR | STANDALONE (specialist outside the ladder)
 
   @@unique([groupId, userId])
 }
@@ -89,6 +89,8 @@ model AgentRun {
   ticketId     String
   ticket       Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   agentUserId  String // the AI_AGENT user executing this run
+  profileId    String? // specialized agent profile used (RESOLVE runs)
+  profile      AgentProfile? @relation(fields: [profileId], references: [id])
   kind         String // TRIAGE | RESOLVE
   status       String    @default("RUNNING") // RUNNING | WAITING_APPROVAL | COMPLETED | FAILED
   conversation String    @default("[]") // JSON: provider message history, used to resume after approvals
@@ -131,6 +133,25 @@ model Approval {
   decidedAt   DateTime?
   deciderId   String?
   decider     User?     @relation("decider", fields: [deciderId], references: [id])
+}
+
+// A specialized resolver persona defined as a Markdown document (YAML
+// frontmatter: name, description, categories, tools; body = system prompt).
+// Seeded from agents/*.md and editable from the UI in the same format.
+model AgentProfile {
+  id           String   @id @default(cuid())
+  slug         String   @unique
+  name         String
+  description  String   @default("")
+  categories   String   @default("[]") // JSON: Category[] this specialist covers
+  tools        String   @default("[]") // JSON: allowed tool names ([] = all enabled tools)
+  systemPrompt String // markdown body appended to the resolver system prompt
+  markdown     String // raw .md source (frontmatter + body)
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  runs AgentRun[]
 }
 
 model ToolPolicy {

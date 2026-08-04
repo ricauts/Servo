@@ -23,7 +23,8 @@ Bring your own Anthropic API key for real model calls — or run entirely offlin
 - **Automated QA review** — after a run that executed medium/high-risk tools, a QA agent reviews the transcript and issues a PASS/FAIL verdict; failures reassign the ticket to a human with an explanatory comment.
 - **KPI dashboard** — open tickets, resolution times, first-response times, AI-vs-human resolution split, approval stats, ticket volume over 30 days.
 - **BYOK with offline mock mode** — plug in an Anthropic API key via Settings or environment variable, or run fully offline with the deterministic mock provider.
-- **Groups & escalation hierarchy** — assignment groups (Development, Analytics, Engineering…) own ticket categories; members carry JUNIOR → MID → SENIOR tiers per group. Priority sets the minimum tier, and any agent can escalate a ticket up a tier or across to another group — the least-loaded eligible member picks it up and the move is logged on the timeline.
+- **Groups & escalation hierarchy** — assignment groups (Development, Analytics, Engineering…) own ticket categories; members carry JUNIOR → MID → SENIOR tiers per group, or STANDALONE for specialists outside the ladder. Priority sets the minimum tier, and any agent can escalate a ticket up a tier or across to another group — the least-loaded eligible member picks it up and the move is logged on the timeline.
+- **Specialized agents as `.md` files** — resolver personas (Analytics, Developer, Cybersecurity…) are Markdown documents with YAML frontmatter (`name`, `categories`, `tools`) and a system-prompt body. Drop files into `agents/` or create/edit them from the UI; the resolver automatically uses the enabled specialist covering the ticket's category, with its tool set narrowed to the profile's allowlist.
 - **Role-based permissions** — ADMIN, AGENT, and REQUESTER roles with a permission matrix; HIGH-risk approvals and group management are admin-only.
 - **Demo user switcher** — hop between seeded users to experience every role without an auth provider.
 - **shadcn/ui frontend** — Tailwind v4 + [shadcn/ui](https://ui.shadcn.com) components and charts (Recharts), themed with Servo's green-accent OKLCH palette; light mode by default with a dark-mode toggle.
@@ -90,6 +91,7 @@ The seed creates these users, switchable from the user switcher in the sidebar:
 | Ana Rodríguez | ADMIN | Everything, including Settings, groups, and HIGH-risk approvals |
 | Bruno Chen | AGENT | Work tickets, run the AI, decide LOW/MEDIUM-risk approvals; SENIOR in Engineering |
 | Elena Duarte, Farid Khan, Gabriela Torres, Hiro Tanaka | AGENT | Group members across Development / Analytics / Engineering at junior→senior tiers |
+| Iris Volkov | AGENT | STANDALONE security specialist in Engineering (outside the tier ladder) |
 | Carla Méndez | REQUESTER | Create tickets, comment |
 | Diego Fontaine | REQUESTER | Create tickets, comment |
 | Servo Triage / Resolver / QA | AI_AGENT | The three AI agents (not switchable personas — they act via runs) |
@@ -106,6 +108,8 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full engine design, [do
 ## Project structure
 
 ```
+agents/
+  *.md                 # specialized resolver agents (frontmatter + system prompt)
 prisma/
   schema.prisma        # data model (SQLite; enum-likes are strings)
   seed.ts              # demo users, tickets, runs, approvals, sandbox ops DB
@@ -116,6 +120,7 @@ src/
     dashboard/         # KPI dashboard
     approvals/         # approvals inbox
     groups/            # assignment groups + escalation tiers
+    agents/            # specialized .md agent profiles
     settings/          # BYOK + tool policies (admin only)
   lib/
     ai/                # provider abstraction, mock provider, tools, prompts, engine

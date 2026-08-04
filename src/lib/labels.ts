@@ -4,10 +4,10 @@
 import type {
   ApprovalStatus,
   Category,
+  MemberTier,
   Priority,
   RiskLevel,
   RunStatus,
-  Seniority,
   TicketStatus,
 } from "@/lib/types";
 
@@ -62,16 +62,18 @@ export const CATEGORY_LABEL: Record<Category, string> = {
   OTHER: "Other",
 };
 
-export const SENIORITY_LABEL: Record<Seniority, string> = {
+export const SENIORITY_LABEL: Record<MemberTier, string> = {
   JUNIOR: "Junior",
   MID: "Mid",
   SENIOR: "Senior",
+  STANDALONE: "Standalone",
 };
 
-export const SENIORITY_TONE: Record<Seniority, BadgeTone> = {
+export const SENIORITY_TONE: Record<MemberTier, BadgeTone> = {
   JUNIOR: "neutral",
   MID: "violet",
   SENIOR: "serious",
+  STANDALONE: "brand",
 };
 
 export const RISK_LABEL: Record<RiskLevel, string> = {

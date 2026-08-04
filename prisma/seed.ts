@@ -4,7 +4,9 @@
 // 30 days (including AI-resolved runs and two pending approvals) so the KPI
 // dashboard and the approvals inbox are meaningful from the first render.
 
+import fs from "fs";
 import path from "path";
+import matter from "gray-matter";
 import { PrismaClient } from "@prisma/client";
 
 const db = new PrismaClient();
@@ -32,6 +34,7 @@ async function main() {
   await db.approval.deleteMany();
   await db.agentStep.deleteMany();
   await db.agentRun.deleteMany();
+  await db.agentProfile.deleteMany();
   await db.comment.deleteMany();
   await db.ticket.deleteMany();
   await db.groupMember.deleteMany();
@@ -87,6 +90,14 @@ async function main() {
       email: "hiro@acme.dev",
       role: "AGENT",
       color: "#31567F",
+    },
+  });
+  const iris = await db.user.create({
+    data: {
+      name: "Iris Volkov",
+      email: "iris@acme.dev",
+      role: "AGENT",
+      color: "#5B4A17",
     },
   });
   const carla = await db.user.create({
@@ -171,10 +182,45 @@ async function main() {
           { userId: bruno.id, seniority: "SENIOR" },
           { userId: elena.id, seniority: "MID" },
           { userId: gabriela.id, seniority: "JUNIOR" },
+          // Security specialist outside the ladder: takes any tier by load.
+          { userId: iris.id, seniority: "STANDALONE" },
         ],
       },
     },
   });
+
+  // -- specialized agent profiles (agents/*.md) ------------------------------
+  const agentsDir = path.join(process.cwd(), "agents");
+  if (fs.existsSync(agentsDir)) {
+    for (const file of fs
+      .readdirSync(agentsDir)
+      .filter((f) => f.endsWith(".md"))
+      .sort()) {
+      const markdown = fs.readFileSync(path.join(agentsDir, file), "utf8");
+      const { data, content } = matter(markdown);
+      const name = String(data.name ?? "").trim();
+      if (!name || !content.trim()) continue;
+      const slug = name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+      await db.agentProfile.create({
+        data: {
+          slug,
+          name,
+          description: String(data.description ?? "").trim(),
+          categories: JSON.stringify(
+            Array.isArray(data.categories) ? data.categories.map(String) : [],
+          ),
+          tools: JSON.stringify(
+            Array.isArray(data.tools) ? data.tools.map(String) : [],
+          ),
+          systemPrompt: content.trim(),
+          markdown,
+        },
+      });
+    }
+  }
 
   // -- settings ------------------------------------------------------------
   await db.setting.createMany({
@@ -865,6 +911,7 @@ async function main() {
   const counts = {
     users: await db.user.count(),
     groups: await db.group.count(),
+    agents: await db.agentProfile.count(),
     tickets: await db.ticket.count(),
     runs: await db.agentRun.count(),
     approvals: await db.approval.count(),

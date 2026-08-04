@@ -28,3 +28,16 @@ export function nextLevel(level: Seniority | string): Seniority | null {
   const i = seniorityRank(level);
   return i >= SENIORITIES.length - 1 ? null : SENIORITIES[i + 1];
 }
+
+/**
+ * Whether a member with the given tier may take a ticket at the given
+ * escalation level. STANDALONE members sit outside the ladder and are
+ * eligible for any level; ladder members need rank ≥ the level's rank.
+ */
+export function memberEligibleFor(
+  memberTier: string,
+  level: Seniority | string,
+): boolean {
+  if (memberTier === "STANDALONE") return true;
+  return seniorityRank(memberTier) >= seniorityRank(level);
+}

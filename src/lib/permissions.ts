@@ -9,6 +9,8 @@ export type Action =
   | "ticket.comment"
   | "group.view"
   | "group.manage"
+  | "agents.view"
+  | "agents.manage"
   | "agent.run"
   | "approval.view"
   | "approval.decide"
@@ -23,6 +25,8 @@ const MATRIX: Record<Action, Role[]> = {
   "ticket.comment": ["ADMIN", "AGENT", "REQUESTER"],
   "group.view": ["ADMIN", "AGENT"],
   "group.manage": ["ADMIN"],
+  "agents.view": ["ADMIN", "AGENT"],
+  "agents.manage": ["ADMIN"],
   "agent.run": ["ADMIN", "AGENT"],
   "approval.view": ["ADMIN", "AGENT"],
   "approval.decide": ["ADMIN", "AGENT"],
