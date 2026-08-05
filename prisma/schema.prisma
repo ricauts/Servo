@@ -162,6 +162,24 @@ model ToolPolicy {
   requiresApproval Boolean @default(false)
 }
 
+// An admin-defined HTTP tool/integration the resolver can call. Enable/disable
+// and risk/approval live in the matching ToolPolicy row (same toolName).
+// {input.field} placeholders are substituted from the model's tool input;
+// {secret} resolves to the stored secret (never returned by the API).
+model CustomTool {
+  id           String   @id @default(cuid())
+  name         String   @unique // snake_case tool name exposed to the model
+  description  String
+  inputSchema  String   @default("{\"type\":\"object\",\"properties\":{}}") // JSON Schema for the tool input
+  method       String   @default("POST") // GET | POST | PUT | PATCH | DELETE
+  url          String // request URL; may contain {input.field}
+  headers      String   @default("{}") // JSON object; values may contain {secret}
+  bodyTemplate String   @default("") // request body; {input.field}/{secret}; empty POST body = raw input JSON
+  secret       String   @default("") // bearer token / API key; never exposed
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 model Setting {
   key   String @id
   value String

@@ -24,7 +24,8 @@ import { pickAgentProfile, profileAllowsTool } from "@/lib/agent-profiles";
 import { qaPrompt, qaSystem, resolverSystem, triageSystem, triageUser } from "./prompts";
 import { getProvider, type ChatProvider, type ToolSpec } from "./provider";
 import { getAiSettings, type AiSettings } from "./settings";
-import { TOOLS } from "./tools";
+import { getToolRegistry } from "./custom-tools";
+import type { ToolDef } from "./tools";
 
 const MAX_ITERATIONS = 12;
 
@@ -39,6 +40,7 @@ interface LoopContext {
   system: string;
   toolSpecs: ToolSpec[];
   policies: Map<string, ToolPolicy>;
+  registry: Record<string, ToolDef>;
   messages: ConversationMessage[];
   nextIndex: number;
 }
@@ -152,11 +154,14 @@ async function failRun(runId: string, ticketId: string, err: unknown): Promise<v
   }
 }
 
-function toolSpecsFor(policies: ToolPolicy[]): ToolSpec[] {
+function toolSpecsFor(
+  policies: ToolPolicy[],
+  registry: Record<string, ToolDef>,
+): ToolSpec[] {
   return policies
-    .filter((policy) => TOOLS[policy.toolName])
+    .filter((policy) => registry[policy.toolName])
     .map((policy) => {
-      const tool = TOOLS[policy.toolName];
+      const tool = registry[policy.toolName];
       return { name: tool.name, description: tool.description, inputSchema: tool.inputSchema };
     });
 }
@@ -170,6 +175,8 @@ async function buildLoopContext(
 ): Promise<LoopContext> {
   const settings = await getAiSettings();
   const enabledPolicies = await db.toolPolicy.findMany({ where: { enabled: true } });
+  // Built-in tools plus admin-defined custom integrations.
+  const registry = await getToolRegistry();
   // A specialized profile (pinned on the run at creation so resumes keep the
   // same persona) narrows the tool set and extends the system prompt.
   const runRow = await db.agentRun.findUnique({
@@ -190,8 +197,9 @@ async function buildLoopContext(
     settings,
     provider: getProvider(settings, { ticket, kind: "RESOLVE" }),
     system,
-    toolSpecs: toolSpecsFor(activePolicies),
+    toolSpecs: toolSpecsFor(activePolicies, registry),
     policies: new Map(activePolicies.map((policy) => [policy.toolName, policy])),
+    registry,
     messages,
     nextIndex,
   };
@@ -400,7 +408,7 @@ async function driveResolverLoop(ctx: LoopContext): Promise<"completed" | "pause
 
     for (let i = 0; i < turn.toolCalls.length; i++) {
       const call = turn.toolCalls[i];
-      const tool = TOOLS[call.name];
+      const tool = ctx.registry[call.name];
       const policy = ctx.policies.get(call.name);
 
       if (!tool || !policy) {
@@ -528,7 +536,7 @@ export async function resumeAfterApproval(approvalId: string): Promise<AgentRun>
 
     if (approval.status === "APPROVED") {
       const input = JSON.parse(approval.toolInput) as Record<string, unknown>;
-      const tool = TOOLS[approval.toolName];
+      const tool = ctx.registry[approval.toolName];
       await addStep(ctx, {
         type: "TOOL_CALL",
         toolName: approval.toolName,

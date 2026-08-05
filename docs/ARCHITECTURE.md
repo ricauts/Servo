@@ -64,7 +64,16 @@ values like `TicketStatus`, `Priority`, `RiskLevel`, and `RunStatus`.
   `resolve_ticket` always allowed) and appends its specialization to the
   resolver system prompt.
 - **ToolPolicy** — per-tool risk level, enabled flag, and
-  `requiresApproval` flag. Editable at runtime from Settings.
+  `requiresApproval` flag. Editable at runtime from Settings. Applies to
+  built-in and custom tools alike.
+- **CustomTool** — an admin-defined HTTP integration exposed to the
+  resolver as a tool: method, URL, headers, body template and a stored
+  secret (never returned by the API). `{input.field}` placeholders are
+  substituted from the model's tool input (URL-encoded in the URL) and
+  `{secret}` injects the secret. `getToolRegistry()`
+  (`src/lib/ai/custom-tools.ts`) merges these with the built-in `TOOLS`
+  registry when a loop context is built, so policies, approval gates and
+  agent-profile allowlists treat them identically to built-ins.
 - **Setting** — key/value store for provider config
   (`ai.provider`, `ai.apiKey`, `ai.baseUrl`, `ai.model`, `ai.autoTriage`,
   `ai.qaEnabled`).

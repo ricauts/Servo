@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { forbid } from "@/lib/permissions";
 import { parseProfileMarkdown, slugify } from "@/lib/agent-profiles";
-import { TOOLS } from "@/lib/ai/tools";
+import { getToolRegistry } from "@/lib/ai/custom-tools";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +40,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     let profile;
     try {
       profile = parseProfileMarkdown(parsed.data.markdown, {
-        knownTools: Object.keys(TOOLS),
+        knownTools: Object.keys(await getToolRegistry()),
       });
     } catch (err) {
       return Response.json(

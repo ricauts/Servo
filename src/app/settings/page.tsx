@@ -21,6 +21,9 @@ import AiProviderForm, {
 import ToolPolicyTable, {
   type ToolPolicyView,
 } from "@/components/admin/ToolPolicyTable";
+import CustomToolsManager, {
+  type CustomToolView,
+} from "@/components/admin/CustomToolsManager";
 
 export const dynamic = "force-dynamic";
 
@@ -52,9 +55,10 @@ export default async function SettingsPage() {
     );
   }
 
-  const [ai, toolPolicies, users] = await Promise.all([
+  const [ai, toolPolicies, customTools, users] = await Promise.all([
     getAiSettings(),
     db.toolPolicy.findMany({ orderBy: { toolName: "asc" } }),
+    db.customTool.findMany({ orderBy: { createdAt: "asc" } }),
     db.user.findMany({ orderBy: { createdAt: "asc" } }),
   ]);
 
@@ -76,6 +80,24 @@ export default async function SettingsPage() {
     enabled: p.enabled,
     requiresApproval: p.requiresApproval,
   }));
+
+  const policyByName = new Map(toolPolicies.map((p) => [p.toolName, p]));
+  const customToolViews: CustomToolView[] = customTools.map((t) => {
+    const policy = policyByName.get(t.name);
+    return {
+      id: t.id,
+      name: t.name,
+      description: t.description,
+      inputSchema: t.inputSchema,
+      method: t.method,
+      url: t.url,
+      headers: t.headers,
+      bodyTemplate: t.bodyTemplate,
+      secretSet: t.secret.length > 0,
+      riskLevel: (policy?.riskLevel ?? "MEDIUM") as RiskLevel,
+      requiresApproval: policy?.requiresApproval ?? true,
+    };
+  });
 
   return (
     <>
@@ -99,6 +121,15 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent>
             <ToolPolicyTable initialPolicies={policyViews} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Custom tools & integrations</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CustomToolsManager tools={customToolViews} />
           </CardContent>
         </Card>
 

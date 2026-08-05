@@ -24,6 +24,7 @@ Bring your own Anthropic API key for real model calls — or run entirely offlin
 - **KPI dashboard** — open tickets, resolution times, first-response times, AI-vs-human resolution split, approval stats, ticket volume over 30 days.
 - **BYOK with offline mock mode** — plug in an Anthropic API key via Settings or environment variable, or run fully offline with the deterministic mock provider.
 - **Groups & escalation hierarchy** — assignment groups (Development, Analytics, Engineering…) own ticket categories; members carry JUNIOR → MID → SENIOR tiers per group, or STANDALONE for specialists outside the ladder. Priority sets the minimum tier, and any agent can escalate a ticket up a tier or across to another group — the least-loaded eligible member picks it up and the move is logged on the timeline.
+- **Custom tools & integrations** — admins define new HTTP tools from Settings (method, URL, headers, body template with `{input.field}` placeholders, and a stored secret injected via `{secret}`). They join the resolver's registry like built-in tools, with the same risk levels and human-approval gates — the fastest path to integrating a webhook, an internal API, or a SaaS endpoint.
 - **Specialized agents as `.md` files** — resolver personas (Analytics, Developer, Cybersecurity…) are Markdown documents with YAML frontmatter (`name`, `categories`, `tools`) and a system-prompt body. Drop files into `agents/` or create/edit them from the UI; the resolver automatically uses the enabled specialist covering the ticket's category, with its tool set narrowed to the profile's allowlist.
 - **Role-based permissions** — ADMIN, AGENT, and REQUESTER roles with a permission matrix; HIGH-risk approvals and group management are admin-only.
 - **Demo user switcher** — hop between seeded users to experience every role without an auth provider.
@@ -157,6 +158,7 @@ Servo is a **proof of concept**. Known shortcuts you should not carry into produ
 - Authentication is a demo cookie-based user switcher — anyone can be anyone.
 - API keys saved via Settings are stored unencrypted in SQLite.
 - The agent's SQL tools run against a *sandboxed* local ops database, but the mutating SQL tool executes model-generated statements (behind the approval gate) — treat that pattern with care in any real deployment.
+- Custom HTTP tools make requests from the server to admin-defined URLs. There is no egress allowlist, so an admin can point them at internal networks (SSRF by design) — restrict who is an admin and add an allowlist before production use. Tool secrets are stored unencrypted in SQLite.
 - No rate limiting, audit log hardening, CSRF protection, or input sanitization beyond basic validation.
 
 ## License
