@@ -89,12 +89,15 @@ export interface ConversationMessage {
 // ---------------------------------------------------------------------------
 
 export const SETTING_KEYS = {
-  provider: "ai.provider", // "anthropic" | "mock"
-  apiKey: "ai.apiKey", // stored key; env ANTHROPIC_API_KEY takes precedence
-  baseUrl: "ai.baseUrl", // optional Anthropic-compatible endpoint
+  provider: "ai.provider", // "anthropic" | "openai" | "mock"
+  apiKey: "ai.apiKey", // stored key; the provider-matching env var takes precedence
+  baseUrl: "ai.baseUrl", // optional provider endpoint
   model: "ai.model", // default "claude-opus-5"
   autoTriage: "ai.autoTriage", // "true" | "false"
   qaEnabled: "ai.qaEnabled", // "true" | "false"
+  smtpEnabled: "integration.smtp.enabled", // "true" | "false"
+  smtpUrl: "integration.smtp.url", // smtp://user:pass@host:port — env SMTP_URL wins; never returned by the API
+  smtpFrom: "integration.smtp.from", // From address for notifications
 } as const;
 
 // ---------------------------------------------------------------------------

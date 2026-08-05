@@ -228,6 +228,17 @@ provider is not usable the engine falls back to mock and Settings shows a
 warning. `POST /api/settings/test` fires a real one-shot completion (never
 the mock) so admins can verify a configuration before saving it.
 
+## Email notifications
+
+`src/lib/notify.ts` sends best-effort SMTP email (nodemailer) on three
+events: ticket created (→ requester), ticket resolved (→ requester, from
+both the `resolve_ticket` tool and manual status changes), and approval
+pending (→ every admin). Config follows the BYOK pattern: `SMTP_URL` env
+wins over the URL stored in Settings, the URL is never returned by the API
+(it may embed credentials), and every send is wrapped so a broken mail
+setup can never break a ticket flow. `POST /api/settings/test-email` sends
+a real test message for the Settings UI.
+
 ## From POC to a real deployment
 
 The sandbox ops DB and the simulated tools are deliberate stand-ins. To take

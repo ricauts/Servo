@@ -3,23 +3,27 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getAiSettings } from "@/lib/ai/settings";
+import { getSmtpConfig } from "@/lib/notify";
 import { forbid } from "@/lib/permissions";
 import { SETTING_KEYS } from "@/lib/types";
 
-/** Shared GET/PUT response. The stored API key is NEVER returned. */
+/** Shared GET/PUT response. Stored secrets (API key, SMTP URL) are NEVER returned. */
 async function settingsPayload() {
   const rows = await db.setting.findMany();
   const settings: Record<string, string> = {};
   for (const row of rows) {
     if (row.key === SETTING_KEYS.apiKey) continue; // never leak the key
+    if (row.key === SETTING_KEYS.smtpUrl) continue; // may embed credentials
     settings[row.key] = row.value;
   }
-  const ai = await getAiSettings();
+  const [ai, smtp] = await Promise.all([getAiSettings(), getSmtpConfig()]);
   const toolPolicies = await db.toolPolicy.findMany({ orderBy: { toolName: "asc" } });
   return {
     settings,
     apiKeySet: ai.apiKey.length > 0,
     keySource: ai.keySource,
+    smtpUrlSet: smtp.url.length > 0,
+    smtpUrlSource: smtp.urlSource,
     toolPolicies,
   };
 }
@@ -39,6 +43,9 @@ const putSchema = z.object({
   model: z.string().optional(),
   autoTriage: z.boolean().optional(),
   qaEnabled: z.boolean().optional(),
+  smtpEnabled: z.boolean().optional(),
+  smtpUrl: z.string().optional(), // empty string clears the stored URL
+  smtpFrom: z.string().optional(),
 });
 
 /** PUT /api/settings — upsert any subset of the AI settings (admin only). */
@@ -65,6 +72,11 @@ export async function PUT(req: NextRequest) {
   if (data.qaEnabled !== undefined) {
     updates.push({ key: SETTING_KEYS.qaEnabled, value: String(data.qaEnabled) });
   }
+  if (data.smtpEnabled !== undefined) {
+    updates.push({ key: SETTING_KEYS.smtpEnabled, value: String(data.smtpEnabled) });
+  }
+  if (data.smtpUrl !== undefined) updates.push({ key: SETTING_KEYS.smtpUrl, value: data.smtpUrl });
+  if (data.smtpFrom !== undefined) updates.push({ key: SETTING_KEYS.smtpFrom, value: data.smtpFrom });
 
   for (const update of updates) {
     await db.setting.upsert({

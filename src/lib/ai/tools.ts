@@ -6,6 +6,7 @@
 import type { User } from "@prisma/client";
 import { db } from "@/lib/db";
 import { opsDb, opsExecute, opsSelect } from "@/lib/opsdb";
+import { notifyTicketResolved } from "@/lib/notify";
 import { jsonSafe } from "@/lib/utils";
 
 export interface ToolContext {
@@ -287,6 +288,7 @@ export const TOOLS: Record<string, ToolDef> = {
           body: `Resolved by ${ctx.agentUser.name}: ${resolution}`,
         },
       });
+      void notifyTicketResolved(ctx.ticketId);
       return "Ticket marked as resolved.";
     },
   },

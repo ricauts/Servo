@@ -21,6 +21,7 @@ import {
   pickGroupAssignee,
 } from "@/lib/escalation";
 import { pickAgentProfile, profileAllowsTool } from "@/lib/agent-profiles";
+import { notifyApprovalPending } from "@/lib/notify";
 import { qaPrompt, qaSystem, resolverSystem, triageSystem, triageUser } from "./prompts";
 import { getProvider, type ChatProvider, type ToolSpec } from "./provider";
 import { getAiSettings, type AiSettings } from "./settings";
@@ -430,7 +431,7 @@ async function driveResolverLoop(ctx: LoopContext): Promise<"completed" | "pause
       }
 
       if (policy.requiresApproval) {
-        await db.approval.create({
+        const approval = await db.approval.create({
           data: {
             runId: ctx.runId,
             ticketId: ctx.ticket.id,
@@ -441,6 +442,7 @@ async function driveResolverLoop(ctx: LoopContext): Promise<"completed" | "pause
             status: "PENDING",
           },
         });
+        void notifyApprovalPending(approval.id);
         await addStep(ctx, {
           type: "APPROVAL_REQUEST",
           toolName: call.name,

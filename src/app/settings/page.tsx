@@ -24,6 +24,8 @@ import ToolPolicyTable, {
 import CustomToolsManager, {
   type CustomToolView,
 } from "@/components/admin/CustomToolsManager";
+import SmtpForm, { type SmtpSettingsView } from "@/components/admin/SmtpForm";
+import { getSmtpConfig } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -55,12 +57,20 @@ export default async function SettingsPage() {
     );
   }
 
-  const [ai, toolPolicies, customTools, users] = await Promise.all([
+  const [ai, smtp, toolPolicies, customTools, users] = await Promise.all([
     getAiSettings(),
+    getSmtpConfig(),
     db.toolPolicy.findMany({ orderBy: { toolName: "asc" } }),
     db.customTool.findMany({ orderBy: { createdAt: "asc" } }),
     db.user.findMany({ orderBy: { createdAt: "asc" } }),
   ]);
+
+  const smtpSettings: SmtpSettingsView = {
+    enabled: smtp.enabled,
+    from: smtp.from,
+    urlSet: smtp.url.length > 0,
+    urlSource: smtp.urlSource,
+  };
 
   const aiSettings: AiSettingsView = {
     provider: ai.configuredProvider,
@@ -130,6 +140,15 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent>
             <CustomToolsManager tools={customToolViews} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Email notifications (SMTP)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SmtpForm initial={smtpSettings} />
           </CardContent>
         </Card>
 

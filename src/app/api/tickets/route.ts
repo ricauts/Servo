@@ -8,6 +8,7 @@ import { CATEGORIES, TICKET_STATUSES } from "@/lib/types";
 import type { Prisma } from "@prisma/client";
 import { runTriage } from "@/lib/ai/engine";
 import { getAiSettings } from "@/lib/ai/settings";
+import { notifyTicketCreated } from "@/lib/notify";
 
 export async function GET(req: NextRequest) {
   await getCurrentUser();
@@ -81,6 +82,8 @@ export async function POST(req: NextRequest) {
       requesterId: user.id,
     },
   });
+
+  void notifyTicketCreated(ticket.id);
 
   // getAiSettings supplies the same default (true when the row is missing)
   // that the settings API/UI report, so behavior and display never diverge.
