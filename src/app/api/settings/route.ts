@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getAiSettings } from "@/lib/ai/settings";
 import { getSmtpConfig } from "@/lib/notify";
+import { getGithubConfig, GITHUB_SETTING_KEYS } from "@/lib/integrations/github";
 import { forbid } from "@/lib/permissions";
 import { SETTING_KEYS } from "@/lib/types";
 
@@ -14,9 +15,14 @@ async function settingsPayload() {
   for (const row of rows) {
     if (row.key === SETTING_KEYS.apiKey) continue; // never leak the key
     if (row.key === SETTING_KEYS.smtpUrl) continue; // may embed credentials
+    if (row.key === GITHUB_SETTING_KEYS.token) continue; // never leak the token
     settings[row.key] = row.value;
   }
-  const [ai, smtp] = await Promise.all([getAiSettings(), getSmtpConfig()]);
+  const [ai, smtp, github] = await Promise.all([
+    getAiSettings(),
+    getSmtpConfig(),
+    getGithubConfig(),
+  ]);
   const toolPolicies = await db.toolPolicy.findMany({ orderBy: { toolName: "asc" } });
   return {
     settings,
@@ -24,6 +30,8 @@ async function settingsPayload() {
     keySource: ai.keySource,
     smtpUrlSet: smtp.url.length > 0,
     smtpUrlSource: smtp.urlSource,
+    githubTokenSet: github.token.length > 0,
+    githubTokenSource: github.tokenSource,
     toolPolicies,
   };
 }
@@ -46,6 +54,9 @@ const putSchema = z.object({
   smtpEnabled: z.boolean().optional(),
   smtpUrl: z.string().optional(), // empty string clears the stored URL
   smtpFrom: z.string().optional(),
+  githubToken: z.string().optional(), // empty string clears the stored token
+  githubOwner: z.string().optional(),
+  githubApiUrl: z.string().optional(),
 });
 
 /** PUT /api/settings — upsert any subset of the AI settings (admin only). */
@@ -77,6 +88,15 @@ export async function PUT(req: NextRequest) {
   }
   if (data.smtpUrl !== undefined) updates.push({ key: SETTING_KEYS.smtpUrl, value: data.smtpUrl });
   if (data.smtpFrom !== undefined) updates.push({ key: SETTING_KEYS.smtpFrom, value: data.smtpFrom });
+  if (data.githubToken !== undefined) {
+    updates.push({ key: GITHUB_SETTING_KEYS.token, value: data.githubToken });
+  }
+  if (data.githubOwner !== undefined) {
+    updates.push({ key: GITHUB_SETTING_KEYS.owner, value: data.githubOwner });
+  }
+  if (data.githubApiUrl !== undefined) {
+    updates.push({ key: GITHUB_SETTING_KEYS.apiUrl, value: data.githubApiUrl });
+  }
 
   for (const update of updates) {
     await db.setting.upsert({

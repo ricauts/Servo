@@ -24,6 +24,7 @@ Bring your own Anthropic API key for real model calls — or run entirely offlin
 - **KPI dashboard** — open tickets, resolution times, first-response times, AI-vs-human resolution split, approval stats, ticket volume over 30 days.
 - **BYOK with offline mock mode** — plug in an Anthropic API key via Settings or environment variable, or run fully offline with the deterministic mock provider.
 - **Groups & escalation hierarchy** — assignment groups (Development, Analytics, Engineering…) own ticket categories; members carry JUNIOR → MID → SENIOR tiers per group, or STANDALONE for specialists outside the ladder. Priority sets the minimum tier, and any agent can escalate a ticket up a tier or across to another group — the least-loaded eligible member picks it up and the move is logged on the timeline.
+- **Real GitHub integration** — add a personal access token (env `GITHUB_TOKEN` or Settings, with a Test-token button) and `github_create_repo` / `github_open_pr` hit the real GitHub API — still behind their risk levels and approval gates. Without a token they stay simulated so the offline demo keeps working. A base-URL override supports GitHub Enterprise.
 - **Email notifications (SMTP)** — real outbound email on the moments that matter: ticket received / resolved to the requester, pending approvals to every admin. Configure any SMTP server via `SMTP_URL` (or Settings), send a test email from the UI, and sending stays best-effort so a broken mail setup never blocks ticket flows.
 - **Custom tools & integrations** — admins define new HTTP tools from Settings (method, URL, headers, body template with `{input.field}` placeholders, and a stored secret injected via `{secret}`). They join the resolver's registry like built-in tools, with the same risk levels and human-approval gates — the fastest path to integrating a webhook, an internal API, or a SaaS endpoint.
 - **Specialized agents as `.md` files** — resolver personas (Analytics, Developer, Cybersecurity…) are Markdown documents with YAML frontmatter (`name`, `categories`, `tools`) and a system-prompt body. Drop files into `agents/` or create/edit them from the UI; the resolver automatically uses the enabled specialist covering the ticket's category, with its tool set narrowed to the profile's allowlist.
@@ -144,7 +145,7 @@ docs/
 
 ## Roadmap
 
-- Real GitHub, Azure, AWS, and GCP integrations replacing the simulated tools
+- Real Azure, AWS, and GCP integrations replacing the simulated cloud tools (GitHub already works with a token)
 - Email intake (create tickets from a mailbox, reply-to-comment; outbound notifications already work)
 - OpenAI-compatible providers alongside Anthropic (Anthropic-compatible endpoints like Z.AI already work via the Base URL setting)
 - SSO and real RBAC (the current roles/permissions are a demo matrix)

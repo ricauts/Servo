@@ -6,6 +6,7 @@
 import type { User } from "@prisma/client";
 import { db } from "@/lib/db";
 import { opsDb, opsExecute, opsSelect } from "@/lib/opsdb";
+import { createRepo, getGithubConfig, openPr } from "@/lib/integrations/github";
 import { notifyTicketResolved } from "@/lib/notify";
 import { jsonSafe } from "@/lib/utils";
 
@@ -151,7 +152,8 @@ export const TOOLS: Record<string, ToolDef> = {
 
   github_create_repo: {
     name: "github_create_repo",
-    description: "Create a new GitHub repository in the acme organization (simulated integration).",
+    description:
+      "Create a new GitHub repository (real API when a token is configured in Settings; simulated otherwise).",
     inputSchema: {
       type: "object",
       properties: {
@@ -164,19 +166,34 @@ export const TOOLS: Record<string, ToolDef> = {
     async execute(input) {
       const name = str(input.name).trim();
       if (!name) return "Error: name is required.";
-      return `Repository acme/${name} created with default branch protection and CI template.`;
+      const config = await getGithubConfig();
+      if (!config.token) {
+        return `[simulated — no GitHub token configured] Repository acme/${name} created with default branch protection and CI template.`;
+      }
+      try {
+        return await createRepo(config, {
+          name,
+          description: str(input.description),
+          private: input.private !== false,
+        });
+      } catch (err) {
+        return `GitHub request failed: ${errorMessage(err)}`;
+      }
     },
   },
 
   github_open_pr: {
     name: "github_open_pr",
-    description: "Open a pull request with proposed changes on an acme repository (simulated integration).",
+    description:
+      "Open a pull request with proposed changes (real API when a token is configured in Settings; simulated otherwise).",
     inputSchema: {
       type: "object",
       properties: {
-        repo: { type: "string", description: "Repository name inside the acme org." },
+        repo: { type: "string", description: "Repository name under the configured owner." },
         title: { type: "string", description: "Pull request title." },
         description: { type: "string", description: "Optional pull request body." },
+        head: { type: "string", description: "Source branch (default servo/proposed-changes)." },
+        base: { type: "string", description: "Target branch (default main)." },
       },
       required: ["repo", "title"],
     },
@@ -184,7 +201,21 @@ export const TOOLS: Record<string, ToolDef> = {
       const repo = str(input.repo).trim();
       const title = str(input.title).trim();
       if (!repo || !title) return "Error: repo and title are required.";
-      return `Pull request opened: https://github.com/acme/${repo}/pull/42 — "${title}".`;
+      const config = await getGithubConfig();
+      if (!config.token) {
+        return `[simulated — no GitHub token configured] Pull request opened: https://github.com/acme/${repo}/pull/42 — "${title}".`;
+      }
+      try {
+        return await openPr(config, {
+          repo,
+          title,
+          description: str(input.description),
+          head: str(input.head) || undefined,
+          base: str(input.base) || undefined,
+        });
+      } catch (err) {
+        return `GitHub request failed: ${errorMessage(err)}`;
+      }
     },
   },
 

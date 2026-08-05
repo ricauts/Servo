@@ -25,7 +25,9 @@ import CustomToolsManager, {
   type CustomToolView,
 } from "@/components/admin/CustomToolsManager";
 import SmtpForm, { type SmtpSettingsView } from "@/components/admin/SmtpForm";
+import GithubForm, { type GithubSettingsView } from "@/components/admin/GithubForm";
 import { getSmtpConfig } from "@/lib/notify";
+import { getGithubConfig } from "@/lib/integrations/github";
 
 export const dynamic = "force-dynamic";
 
@@ -57,13 +59,20 @@ export default async function SettingsPage() {
     );
   }
 
-  const [ai, smtp, toolPolicies, customTools, users] = await Promise.all([
+  const [ai, smtp, github, toolPolicies, customTools, users] = await Promise.all([
     getAiSettings(),
     getSmtpConfig(),
+    getGithubConfig(),
     db.toolPolicy.findMany({ orderBy: { toolName: "asc" } }),
     db.customTool.findMany({ orderBy: { createdAt: "asc" } }),
     db.user.findMany({ orderBy: { createdAt: "asc" } }),
   ]);
+
+  const githubSettings: GithubSettingsView = {
+    owner: github.owner,
+    tokenSet: github.token.length > 0,
+    tokenSource: github.tokenSource,
+  };
 
   const smtpSettings: SmtpSettingsView = {
     enabled: smtp.enabled,
@@ -149,6 +158,15 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent>
             <SmtpForm initial={smtpSettings} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>GitHub integration</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <GithubForm initial={githubSettings} />
           </CardContent>
         </Card>
 

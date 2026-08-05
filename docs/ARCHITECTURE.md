@@ -228,6 +228,17 @@ provider is not usable the engine falls back to mock and Settings shows a
 warning. `POST /api/settings/test` fires a real one-shot completion (never
 the mock) so admins can verify a configuration before saving it.
 
+## GitHub integration
+
+`src/lib/integrations/github.ts` upgrades `github_create_repo` and
+`github_open_pr` from simulations to real REST calls when a token exists
+(`GITHUB_TOKEN` env wins over the Settings copy; the token is never
+returned by the API). Config includes an optional default owner (org or
+user; org 404s fall back to the user namespace) and an API base-URL
+override for GitHub Enterprise or testing. `POST /api/settings/test-github`
+verifies a token with `GET /user`. Tool errors come back as descriptive
+strings so the agent can adapt instead of crashing the run.
+
 ## Email notifications
 
 `src/lib/notify.ts` sends best-effort SMTP email (nodemailer) on three
