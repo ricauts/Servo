@@ -25,7 +25,7 @@ export default function AiVsHumanBar({
 
   if (total === 0) {
     return (
-      <div className="flex h-[220px] items-center justify-center font-sans text-sm text-muted-foreground">
+      <div className="flex h-[180px] items-center justify-center font-sans text-sm text-muted-foreground">
         No resolutions in the last 30 days.
       </div>
     );
@@ -38,7 +38,7 @@ export default function AiVsHumanBar({
 
   return (
     <div className="flex flex-col items-center gap-1">
-      <ChartContainer config={config} className="aspect-square h-[190px]">
+      <ChartContainer config={config} className="aspect-square h-[160px]">
         <PieChart>
           <ChartTooltip
             cursor={false}
@@ -48,7 +48,8 @@ export default function AiVsHumanBar({
             data={data}
             dataKey="count"
             nameKey="kind"
-            innerRadius={58}
+            innerRadius={45}
+            outerRadius={72}
             strokeWidth={2}
             stroke="var(--card)"
             isAnimationActive={false}

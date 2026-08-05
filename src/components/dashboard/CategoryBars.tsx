@@ -26,14 +26,14 @@ export default function CategoryBars({
 
   if (rows.length === 0) {
     return (
-      <div className="flex h-[280px] items-center justify-center font-sans text-sm text-muted-foreground">
+      <div className="flex h-[220px] items-center justify-center font-sans text-sm text-muted-foreground">
         No open tickets right now.
       </div>
     );
   }
 
   return (
-    <ChartContainer config={config} className="aspect-auto h-[280px] w-full">
+    <ChartContainer config={config} className="aspect-auto h-[220px] w-full">
       <BarChart data={rows} layout="vertical" margin={{ left: 4, right: 28 }}>
         <CartesianGrid horizontal={false} />
         <XAxis type="number" hide />

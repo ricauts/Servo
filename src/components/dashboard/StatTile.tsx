@@ -19,7 +19,7 @@ export default function StatTile({
   return (
     <Card
       className={cn(
-        "gap-2 px-5 py-4",
+        "gap-1.5 px-5 py-3",
         highlight && "bg-warn-soft/50 ring-warn/50 dark:bg-warn/10",
       )}
     >
@@ -29,7 +29,7 @@ export default function StatTile({
       <div className="flex items-baseline gap-1.5">
         <span
           className={cn(
-            "font-heading text-[32px] font-semibold leading-none tracking-tight text-foreground",
+            "font-heading text-[28px] font-semibold leading-none tracking-tight text-foreground",
             highlight && "text-warn",
           )}
         >

@@ -32,14 +32,14 @@ export default function FlowChart({ data }: { data: Point[] }) {
   const empty = data.every((p) => p.created === 0 && p.resolved === 0);
   if (empty) {
     return (
-      <div className="flex h-[280px] items-center justify-center font-sans text-sm text-muted-foreground">
+      <div className="flex h-[220px] items-center justify-center font-sans text-sm text-muted-foreground">
         No ticket activity in the last 30 days.
       </div>
     );
   }
 
   return (
-    <ChartContainer config={config} className="aspect-auto h-[280px] w-full">
+    <ChartContainer config={config} className="aspect-auto h-[220px] w-full">
       <AreaChart data={data} margin={{ left: 0, right: 12, top: 8 }}>
         <defs>
           <linearGradient id="fillCreated" x1="0" y1="0" x2="0" y2="1">

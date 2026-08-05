@@ -50,9 +50,9 @@ export default async function DashboardPage() {
         title="Dashboard"
         description="Operational KPIs across tickets, agents and approvals — last 30 days."
       />
-      <div className="grid grid-cols-12 gap-4 p-4 md:p-8">
+      <div className="grid grid-cols-12 gap-3 p-4 md:px-8 md:py-5">
         {/* Stat tile row */}
-        <div className="col-span-12 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+        <div className="col-span-12 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           <StatTile label="Open tickets" value={String(totals.open)} />
           <StatTile
             label="Resolved · 30d"
@@ -89,31 +89,31 @@ export default async function DashboardPage() {
         </div>
 
         {/* Ticket flow */}
-        <Card className="col-span-12 gap-4 px-5 py-5 xl:col-span-8">
+        <Card className="col-span-12 gap-3 px-5 py-4 xl:col-span-8">
           <CardHeading>Ticket flow — last 30 days</CardHeading>
           <FlowChart data={kpis.createdByDay} />
         </Card>
 
         {/* Open load by category */}
-        <Card className="col-span-12 gap-4 px-5 py-5 xl:col-span-4">
+        <Card className="col-span-12 gap-3 px-5 py-4 xl:col-span-4">
           <CardHeading>Open load by category</CardHeading>
           <CategoryBars data={kpis.byCategory} />
         </Card>
 
         {/* By priority */}
-        <Card className="col-span-12 gap-4 px-5 py-5 md:col-span-4">
+        <Card className="col-span-12 gap-3 px-5 py-4 md:col-span-4">
           <CardHeading>By priority</CardHeading>
           <PriorityBars data={kpis.byPriority} />
         </Card>
 
         {/* AI vs human resolutions */}
-        <Card className="col-span-12 gap-4 px-5 py-5 md:col-span-5">
+        <Card className="col-span-12 gap-3 px-5 py-4 md:col-span-5">
           <CardHeading>AI vs human resolutions — 30d</CardHeading>
           <AiVsHumanBar ai={aiResolved} human={humanResolved} />
         </Card>
 
         {/* Approvals mini-tile */}
-        <Card className="col-span-12 gap-2 px-5 py-5 md:col-span-3">
+        <Card className="col-span-12 gap-2 px-5 py-4 md:col-span-3">
           <CardHeading>Approvals</CardHeading>
           <ApprovalsTile
             approved={approvalStats.approved}
