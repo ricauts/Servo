@@ -6,6 +6,7 @@ import { getAiSettings } from "@/lib/ai/settings";
 import { getSmtpConfig } from "@/lib/notify";
 import { getGithubConfig, GITHUB_SETTING_KEYS } from "@/lib/integrations/github";
 import { azureConfigured, getAzureConfig, AZURE_SETTING_KEYS } from "@/lib/integrations/azure";
+import { getInboundConfig, INBOUND_SETTING_KEYS } from "@/lib/inbound-email";
 import { forbid } from "@/lib/permissions";
 import { SETTING_KEYS } from "@/lib/types";
 
@@ -18,13 +19,15 @@ async function settingsPayload() {
     if (row.key === SETTING_KEYS.smtpUrl) continue; // may embed credentials
     if (row.key === GITHUB_SETTING_KEYS.token) continue; // never leak the token
     if (row.key === AZURE_SETTING_KEYS.clientSecret) continue; // never leak the secret
+    if (row.key === INBOUND_SETTING_KEYS.secret) continue; // never leak the secret
     settings[row.key] = row.value;
   }
-  const [ai, smtp, github, azure] = await Promise.all([
+  const [ai, smtp, github, azure, inbound] = await Promise.all([
     getAiSettings(),
     getSmtpConfig(),
     getGithubConfig(),
     getAzureConfig(),
+    getInboundConfig(),
   ]);
   const toolPolicies = await db.toolPolicy.findMany({ orderBy: { toolName: "asc" } });
   return {
@@ -37,6 +40,8 @@ async function settingsPayload() {
     githubTokenSource: github.tokenSource,
     azureConfigured: azureConfigured(azure),
     azureSecretSource: azure.secretSource,
+    inboundSecretSet: inbound.secret.length > 0,
+    inboundSecretSource: inbound.secretSource,
     toolPolicies,
   };
 }
@@ -66,6 +71,8 @@ const putSchema = z.object({
   azureClientId: z.string().optional(),
   azureClientSecret: z.string().optional(), // empty string clears the stored secret
   azureSubscriptionId: z.string().optional(),
+  inboundEnabled: z.boolean().optional(),
+  inboundSecret: z.string().optional(), // empty string clears the stored secret
 });
 
 /** PUT /api/settings — upsert any subset of the AI settings (admin only). */
@@ -117,6 +124,12 @@ export async function PUT(req: NextRequest) {
   }
   if (data.azureSubscriptionId !== undefined) {
     updates.push({ key: AZURE_SETTING_KEYS.subscriptionId, value: data.azureSubscriptionId });
+  }
+  if (data.inboundEnabled !== undefined) {
+    updates.push({ key: INBOUND_SETTING_KEYS.enabled, value: String(data.inboundEnabled) });
+  }
+  if (data.inboundSecret !== undefined) {
+    updates.push({ key: INBOUND_SETTING_KEYS.secret, value: data.inboundSecret });
   }
 
   for (const update of updates) {

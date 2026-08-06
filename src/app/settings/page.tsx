@@ -33,7 +33,11 @@ import CustomToolsManager, {
 import SmtpForm, { type SmtpSettingsView } from "@/components/admin/SmtpForm";
 import GithubForm, { type GithubSettingsView } from "@/components/admin/GithubForm";
 import AzureForm, { type AzureSettingsView } from "@/components/admin/AzureForm";
+import InboundEmailForm, {
+  type InboundSettingsView,
+} from "@/components/admin/InboundEmailForm";
 import { getSmtpConfig } from "@/lib/notify";
+import { getInboundConfig } from "@/lib/inbound-email";
 import { getGithubConfig } from "@/lib/integrations/github";
 import { azureConfigured, getAzureConfig } from "@/lib/integrations/azure";
 
@@ -67,15 +71,22 @@ export default async function SettingsPage() {
     );
   }
 
-  const [ai, smtp, github, azure, toolPolicies, customTools, users] = await Promise.all([
+  const [ai, smtp, inbound, github, azure, toolPolicies, customTools, users] = await Promise.all([
     getAiSettings(),
     getSmtpConfig(),
+    getInboundConfig(),
     getGithubConfig(),
     getAzureConfig(),
     db.toolPolicy.findMany({ orderBy: { toolName: "asc" } }),
     db.customTool.findMany({ orderBy: { createdAt: "asc" } }),
     db.user.findMany({ orderBy: { createdAt: "asc" } }),
   ]);
+
+  const inboundSettings: InboundSettingsView = {
+    enabled: inbound.enabled,
+    secretSet: inbound.secret.length > 0,
+    secretSource: inbound.secretSource,
+  };
 
   const azureSettings: AzureSettingsView = {
     tenantId: azure.tenantId,
@@ -189,6 +200,15 @@ export default async function SettingsPage() {
             </CardHeader>
             <CardContent>
               <SmtpForm initial={smtpSettings} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Inbound email (tickets from a mailbox)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <InboundEmailForm initial={inboundSettings} />
             </CardContent>
           </Card>
 

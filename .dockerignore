@@ -7,3 +7,6 @@ prisma/*.db-journal
 .env.local
 *.md
 docs
+
+# agents/*.md are data, not documentation — the seed loads them.
+!agents

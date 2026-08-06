@@ -251,6 +251,25 @@ override for GitHub Enterprise or testing. `POST /api/settings/test-github`
 verifies a token with `GET /user`. Tool errors come back as descriptive
 strings so the agent can adapt instead of crashing the run.
 
+## Inbound email
+
+`POST /api/inbound/email` (`src/lib/inbound-email.ts`) ingests messages from
+a provider webhook — SendGrid Inbound Parse, Mailgun Routes, Postmark, or a
+small IMAP relay. It accepts JSON, form-urlencoded and multipart bodies and
+maps each provider's field names (`from`/`sender`/`From`,
+`text`/`body-plain`/`TextBody`). Auth is a shared secret sent as the
+`x-servo-token` header or `?token=` for providers that cannot set headers;
+the endpoint 404s while the integration is disabled so it does not
+advertise itself.
+
+Routing: a subject carrying `#<number>` appends a comment to that ticket
+(unless it is CLOSED, which starts a fresh thread); anything else opens a
+ticket and runs triage. Unknown senders are created as `REQUESTER` users,
+so an external customer can mail in without an account. Quoted history and
+signatures are stripped so a reply stores what the person actually wrote.
+Triage failures are swallowed: rejecting the delivery would make the
+provider retry and duplicate the ticket.
+
 ## Email notifications
 
 `src/lib/notify.ts` sends best-effort SMTP email (nodemailer) on three
