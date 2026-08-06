@@ -8,6 +8,7 @@ import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
 import { PrismaClient } from "@prisma/client";
+import { DEFAULT_TOOL_POLICIES } from "../src/lib/ai/tool-policies";
 
 const db = new PrismaClient();
 
@@ -236,71 +237,8 @@ async function main() {
   });
 
   // -- tool policies ---------------------------------------------------------
-  await db.toolPolicy.createMany({
-    data: [
-      {
-        toolName: "query_ops_database",
-        description: "Run read-only SQL (SELECT) against the connected database.",
-        riskLevel: "LOW",
-        requiresApproval: false,
-      },
-      {
-        toolName: "execute_ops_sql",
-        description:
-          "Run mutating SQL (CREATE/ALTER/INSERT/UPDATE/DELETE/DROP) against the connected database.",
-        riskLevel: "HIGH",
-        requiresApproval: true,
-      },
-      {
-        toolName: "get_device_info",
-        description: "Look up a device in the asset inventory by asset tag.",
-        riskLevel: "LOW",
-        requiresApproval: false,
-      },
-      {
-        toolName: "reset_password",
-        description: "Reset a user's password and send a recovery link (simulated).",
-        riskLevel: "MEDIUM",
-        requiresApproval: false,
-      },
-      {
-        toolName: "github_create_repo",
-        description: "Create a new GitHub repository (simulated integration).",
-        riskLevel: "MEDIUM",
-        requiresApproval: false,
-      },
-      {
-        toolName: "github_open_pr",
-        description: "Open a pull request with proposed changes (simulated integration).",
-        riskLevel: "MEDIUM",
-        requiresApproval: false,
-      },
-      {
-        toolName: "cloud_plan_deployment",
-        description: "Generate an IaC deployment plan (Azure/AWS/GCP, simulated).",
-        riskLevel: "LOW",
-        requiresApproval: false,
-      },
-      {
-        toolName: "cloud_apply_deployment",
-        description: "Apply a previously generated deployment plan (simulated).",
-        riskLevel: "HIGH",
-        requiresApproval: true,
-      },
-      {
-        toolName: "post_comment",
-        description: "Post a public comment on the ticket.",
-        riskLevel: "LOW",
-        requiresApproval: false,
-      },
-      {
-        toolName: "resolve_ticket",
-        description: "Mark the ticket as resolved with a resolution note.",
-        riskLevel: "LOW",
-        requiresApproval: false,
-      },
-    ],
-  });
+  // Shared with ensureToolPolicies() so seeded and upgraded installs agree.
+  await db.toolPolicy.createMany({ data: DEFAULT_TOOL_POLICIES });
 
   // -- sandbox ops database --------------------------------------------------
   for (const table of [

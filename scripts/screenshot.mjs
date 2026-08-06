@@ -1,5 +1,8 @@
 // Screenshot helper for docs/assets — drives the system Chrome via puppeteer-core.
-// Usage: node scripts/screenshot.mjs <url> <outfile> [--dark] [--width=1440] [--height=900]
+// Usage: node scripts/screenshot.mjs <url> <outfile> [--dark] [--width=1440]
+//        [--height=900] [--click="Tab label"]
+// --click clicks the first element whose trimmed text matches, before shooting
+// (used to capture a specific tab).
 import puppeteer from "puppeteer-core";
 
 const CHROME_PATHS = [
@@ -34,7 +37,21 @@ try {
     await page.evaluateOnNewDocument(() => localStorage.setItem("theme", "dark"));
   }
   await page.goto(url, { waitUntil: "networkidle0", timeout: 30000 });
-  await new Promise((r) => setTimeout(r, 700));
+  const clickText = flags.find((f) => f.startsWith("--click="))?.slice(8);
+  if (clickText) {
+    // Wait for hydration before clicking, then dispatch a real mouse event so
+    // Radix/React handlers fire.
+    await new Promise((r) => setTimeout(r, 1200));
+    const handle = await page.evaluateHandle((text) => {
+      return [...document.querySelectorAll("button, [role='tab'], a")].find(
+        (candidate) => candidate.textContent.trim() === text,
+      );
+    }, clickText);
+    const element = handle.asElement();
+    if (!element) throw new Error(`--click target not found: ${clickText}`);
+    await element.click();
+  }
+  await new Promise((r) => setTimeout(r, 900));
   await page.screenshot({ path: outfile });
   console.log(`saved ${outfile} (${width}x${height}${dark ? ", dark" : ""})`);
 } finally {

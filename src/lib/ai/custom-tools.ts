@@ -6,6 +6,7 @@
 
 import type { CustomTool } from "@prisma/client";
 import { db } from "@/lib/db";
+import { DEFAULT_TOOL_POLICIES } from "./tool-policies";
 import { TOOLS, type ToolDef } from "./tools";
 
 const RESPONSE_LIMIT = 2000;
@@ -88,6 +89,19 @@ export function customToolToDef(tool: CustomTool): ToolDef {
  * collisions (creation validates against them anyway). Availability is still
  * governed by the ToolPolicy rows the engine filters on.
  */
+/**
+ * Backfill policy rows for built-in tools that have none — a tool added by an
+ * upgrade would otherwise stay invisible until a destructive reseed. Existing
+ * rows (including admin edits) are never touched.
+ */
+export async function ensureToolPolicies(): Promise<void> {
+  const existing = await db.toolPolicy.findMany({ select: { toolName: true } });
+  const known = new Set(existing.map((p) => p.toolName));
+  const missing = DEFAULT_TOOL_POLICIES.filter((p) => !known.has(p.toolName));
+  if (missing.length === 0) return;
+  await db.toolPolicy.createMany({ data: missing });
+}
+
 export async function getToolRegistry(): Promise<Record<string, ToolDef>> {
   const custom = await db.customTool.findMany();
   const registry: Record<string, ToolDef> = {};

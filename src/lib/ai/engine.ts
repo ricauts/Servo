@@ -25,7 +25,7 @@ import { notifyApprovalPending } from "@/lib/notify";
 import { qaPrompt, qaSystem, resolverSystem, triageSystem, triageUser } from "./prompts";
 import { getProvider, type ChatProvider, type ToolSpec } from "./provider";
 import { getAiSettings, type AiSettings } from "./settings";
-import { getToolRegistry } from "./custom-tools";
+import { ensureToolPolicies, getToolRegistry } from "./custom-tools";
 import type { ToolDef } from "./tools";
 
 const MAX_ITERATIONS = 12;
@@ -175,6 +175,9 @@ async function buildLoopContext(
   nextIndex: number,
 ): Promise<LoopContext> {
   const settings = await getAiSettings();
+  // Built-in tools added by an upgrade need their policy row before the
+  // enabled-policy query below can surface them.
+  await ensureToolPolicies();
   const enabledPolicies = await db.toolPolicy.findMany({ where: { enabled: true } });
   // Built-in tools plus admin-defined custom integrations.
   const registry = await getToolRegistry();

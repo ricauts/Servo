@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { getAiSettings } from "@/lib/ai/settings";
 import { getSmtpConfig } from "@/lib/notify";
 import { getGithubConfig, GITHUB_SETTING_KEYS } from "@/lib/integrations/github";
+import { azureConfigured, getAzureConfig, AZURE_SETTING_KEYS } from "@/lib/integrations/azure";
 import { forbid } from "@/lib/permissions";
 import { SETTING_KEYS } from "@/lib/types";
 
@@ -16,12 +17,14 @@ async function settingsPayload() {
     if (row.key === SETTING_KEYS.apiKey) continue; // never leak the key
     if (row.key === SETTING_KEYS.smtpUrl) continue; // may embed credentials
     if (row.key === GITHUB_SETTING_KEYS.token) continue; // never leak the token
+    if (row.key === AZURE_SETTING_KEYS.clientSecret) continue; // never leak the secret
     settings[row.key] = row.value;
   }
-  const [ai, smtp, github] = await Promise.all([
+  const [ai, smtp, github, azure] = await Promise.all([
     getAiSettings(),
     getSmtpConfig(),
     getGithubConfig(),
+    getAzureConfig(),
   ]);
   const toolPolicies = await db.toolPolicy.findMany({ orderBy: { toolName: "asc" } });
   return {
@@ -32,6 +35,8 @@ async function settingsPayload() {
     smtpUrlSource: smtp.urlSource,
     githubTokenSet: github.token.length > 0,
     githubTokenSource: github.tokenSource,
+    azureConfigured: azureConfigured(azure),
+    azureSecretSource: azure.secretSource,
     toolPolicies,
   };
 }
@@ -57,6 +62,10 @@ const putSchema = z.object({
   githubToken: z.string().optional(), // empty string clears the stored token
   githubOwner: z.string().optional(),
   githubApiUrl: z.string().optional(),
+  azureTenantId: z.string().optional(),
+  azureClientId: z.string().optional(),
+  azureClientSecret: z.string().optional(), // empty string clears the stored secret
+  azureSubscriptionId: z.string().optional(),
 });
 
 /** PUT /api/settings — upsert any subset of the AI settings (admin only). */
@@ -96,6 +105,18 @@ export async function PUT(req: NextRequest) {
   }
   if (data.githubApiUrl !== undefined) {
     updates.push({ key: GITHUB_SETTING_KEYS.apiUrl, value: data.githubApiUrl });
+  }
+  if (data.azureTenantId !== undefined) {
+    updates.push({ key: AZURE_SETTING_KEYS.tenantId, value: data.azureTenantId });
+  }
+  if (data.azureClientId !== undefined) {
+    updates.push({ key: AZURE_SETTING_KEYS.clientId, value: data.azureClientId });
+  }
+  if (data.azureClientSecret !== undefined) {
+    updates.push({ key: AZURE_SETTING_KEYS.clientSecret, value: data.azureClientSecret });
+  }
+  if (data.azureSubscriptionId !== undefined) {
+    updates.push({ key: AZURE_SETTING_KEYS.subscriptionId, value: data.azureSubscriptionId });
   }
 
   for (const update of updates) {

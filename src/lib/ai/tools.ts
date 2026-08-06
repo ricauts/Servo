@@ -7,6 +7,7 @@ import type { User } from "@prisma/client";
 import { db } from "@/lib/db";
 import { opsDb, opsExecute, opsSelect } from "@/lib/opsdb";
 import { createRepo, getGithubConfig, openPr } from "@/lib/integrations/github";
+import { azureConfigured, getAzureConfig, listResources } from "@/lib/integrations/azure";
 import { notifyTicketResolved } from "@/lib/notify";
 import { jsonSafe } from "@/lib/utils";
 
@@ -215,6 +216,39 @@ export const TOOLS: Record<string, ToolDef> = {
         });
       } catch (err) {
         return `GitHub request failed: ${errorMessage(err)}`;
+      }
+    },
+  },
+
+  azure_list_resources: {
+    name: "azure_list_resources",
+    description:
+      "List Azure resources in the configured subscription, optionally scoped to a resource group (read-only; real API when Azure credentials are configured, simulated otherwise).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        resourceGroup: {
+          type: "string",
+          description: "Optional resource group name to scope the listing.",
+        },
+      },
+    },
+    async execute(input) {
+      const resourceGroup = str(input.resourceGroup).trim();
+      const config = await getAzureConfig();
+      if (!azureConfigured(config)) {
+        return [
+          "[simulated — no Azure credentials configured]",
+          `3 resource(s)${resourceGroup ? ` in ${resourceGroup}` : ""}:`,
+          "- statuspage-prod (Microsoft.App/containerApps) in eastus",
+          "- servo-sql-prod (Microsoft.Sql/servers) in eastus",
+          "- servo-kv-prod (Microsoft.KeyVault/vaults) in eastus",
+        ].join("\n");
+      }
+      try {
+        return await listResources(config, resourceGroup || undefined);
+      } catch (err) {
+        return `Azure request failed: ${errorMessage(err)}`;
       }
     },
   },

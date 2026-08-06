@@ -228,6 +228,18 @@ provider is not usable the engine falls back to mock and Settings shows a
 warning. `POST /api/settings/test` fires a real one-shot completion (never
 the mock) so admins can verify a configuration before saving it.
 
+## Azure integration (read-only)
+
+`src/lib/integrations/azure.ts` authenticates a service principal
+(client-credentials against AAD) and issues **read-only** Resource Manager
+GETs for `azure_list_resources` — subscription-wide or scoped to a resource
+group. Mutating cloud actions stay simulated on purpose: the HIGH-risk
+`cloud_apply_deployment` gate is the pattern being demonstrated, not a real
+deploy. `AZURE_*` env vars win over Settings, the client secret is never
+returned by the API, and `AZURE_LOGIN_URL` / `AZURE_ARM_URL` can be
+overridden (sovereign clouds, tests). `POST /api/settings/test-azure`
+acquires a token and lists resources so a config is proven end to end.
+
 ## GitHub integration
 
 `src/lib/integrations/github.ts` upgrades `github_create_repo` and
