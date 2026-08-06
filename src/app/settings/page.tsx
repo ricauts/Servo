@@ -38,6 +38,11 @@ import InboundEmailForm, {
 } from "@/components/admin/InboundEmailForm";
 import { getSmtpConfig } from "@/lib/notify";
 import { getInboundConfig } from "@/lib/inbound-email";
+import { ensureSlaPolicies } from "@/lib/sla";
+import SlaPolicyTable, {
+  type SlaPolicyView,
+} from "@/components/admin/SlaPolicyTable";
+import { PRIORITIES } from "@/lib/types";
 import { getGithubConfig } from "@/lib/integrations/github";
 import { azureConfigured, getAzureConfig } from "@/lib/integrations/azure";
 
@@ -71,16 +76,34 @@ export default async function SettingsPage() {
     );
   }
 
-  const [ai, smtp, inbound, github, azure, toolPolicies, customTools, users] = await Promise.all([
+  await ensureSlaPolicies();
+  const [ai, smtp, inbound, github, azure, toolPolicies, customTools, users, slaPolicies] =
+    await Promise.all([
     getAiSettings(),
     getSmtpConfig(),
     getInboundConfig(),
     getGithubConfig(),
     getAzureConfig(),
-    db.toolPolicy.findMany({ orderBy: { toolName: "asc" } }),
-    db.customTool.findMany({ orderBy: { createdAt: "asc" } }),
-    db.user.findMany({ orderBy: { createdAt: "asc" } }),
-  ]);
+      db.toolPolicy.findMany({ orderBy: { toolName: "asc" } }),
+      db.customTool.findMany({ orderBy: { createdAt: "asc" } }),
+      db.user.findMany({ orderBy: { createdAt: "asc" } }),
+      db.slaPolicy.findMany(),
+    ]);
+
+  const slaByPriority = new Map(slaPolicies.map((p) => [p.priority, p]));
+  const slaViews: SlaPolicyView[] = PRIORITIES.flatMap((priority) => {
+    const policy = slaByPriority.get(priority);
+    return policy
+      ? [
+          {
+            priority,
+            responseMinutes: policy.responseMinutes,
+            resolutionMinutes: policy.resolutionMinutes,
+            escalateOnBreach: policy.escalateOnBreach,
+          },
+        ]
+      : [];
+  });
 
   const inboundSettings: InboundSettingsView = {
     enabled: inbound.enabled,
@@ -158,6 +181,7 @@ export default async function SettingsPage() {
         <TabsList>
           <TabsTrigger value="ai">AI provider</TabsTrigger>
           <TabsTrigger value="tools">Tools</TabsTrigger>
+          <TabsTrigger value="sla">SLA</TabsTrigger>
           <TabsTrigger value="integrations">Integrations</TabsTrigger>
           <TabsTrigger value="team">Team</TabsTrigger>
         </TabsList>
@@ -189,6 +213,17 @@ export default async function SettingsPage() {
             </CardHeader>
             <CardContent>
               <CustomToolsManager tools={customToolViews} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="sla">
+          <Card>
+            <CardHeader>
+              <CardTitle>SLA targets & auto-escalation</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <SlaPolicyTable initialPolicies={slaViews} />
             </CardContent>
           </Card>
         </TabsContent>

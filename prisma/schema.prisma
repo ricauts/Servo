@@ -67,6 +67,11 @@ model Ticket {
   updatedAt       DateTime  @updatedAt
   firstResponseAt DateTime?
   resolvedAt      DateTime?
+  // SLA targets derived from the priority's policy; recomputed when the
+  // priority changes. slaEscalatedAt makes breach escalation fire once.
+  responseDueAt   DateTime?
+  resolutionDueAt DateTime?
+  slaEscalatedAt  DateTime?
 
   comments  Comment[]
   runs      AgentRun[]
@@ -183,4 +188,13 @@ model CustomTool {
 model Setting {
   key   String @id
   value String
+}
+
+// Response/resolution targets per priority. One row per Priority value.
+model SlaPolicy {
+  priority          String  @id // LOW | MEDIUM | HIGH | URGENT
+  responseMinutes   Int
+  resolutionMinutes Int
+  // Raise the ticket one escalation tier when a target is missed.
+  escalateOnBreach  Boolean @default(true)
 }

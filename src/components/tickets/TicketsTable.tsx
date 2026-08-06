@@ -17,6 +17,7 @@ import {
 import Avatar from "@/components/legacy/Avatar";
 import Badge from "@/components/legacy/Badge";
 import RelativeTime from "@/components/tickets/RelativeTime";
+import SlaBadge from "@/components/tickets/SlaBadge";
 import {
   CATEGORY_LABEL,
   PRIORITY_LABEL,
@@ -39,6 +40,12 @@ export type TicketRow = {
   assigneeIsAi: boolean;
   /** ISO timestamp */
   updatedAt: string;
+  /** ISO timestamps feeding the SLA badge. */
+  createdAt: string;
+  firstResponseAt: string | null;
+  resolvedAt: string | null;
+  responseDueAt: string | null;
+  resolutionDueAt: string | null;
 };
 
 export default function TicketsTable({ rows }: { rows: TicketRow[] }) {
@@ -65,6 +72,9 @@ export default function TicketsTable({ rows }: { rows: TicketRow[] }) {
           </TableHead>
           <TableHead className="w-[104px] font-heading text-xs text-muted-foreground">
             Priority
+          </TableHead>
+          <TableHead className="w-[130px] font-heading text-xs text-muted-foreground">
+            SLA
           </TableHead>
           <TableHead className="w-[140px] font-heading text-xs text-muted-foreground">
             Category
@@ -107,6 +117,9 @@ export default function TicketsTable({ rows }: { rows: TicketRow[] }) {
               <Badge tone={PRIORITY_TONE[t.priority as Priority] ?? "neutral"}>
                 {PRIORITY_LABEL[t.priority as Priority] ?? t.priority}
               </Badge>
+            </TableCell>
+            <TableCell>
+              <SlaBadge ticket={t} />
             </TableCell>
             <TableCell className="truncate text-sm text-muted-foreground">
               {CATEGORY_LABEL[t.category as Category] ?? t.category}

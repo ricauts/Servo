@@ -9,6 +9,7 @@ import path from "path";
 import matter from "gray-matter";
 import { PrismaClient } from "@prisma/client";
 import { DEFAULT_TOOL_POLICIES } from "../src/lib/ai/tool-policies";
+import { DEFAULT_SLA_POLICIES } from "../src/lib/sla-rules";
 
 const db = new PrismaClient();
 
@@ -42,6 +43,7 @@ async function main() {
   await db.groupMember.deleteMany();
   await db.group.deleteMany();
   await db.toolPolicy.deleteMany();
+  await db.slaPolicy.deleteMany();
   await db.setting.deleteMany();
   await db.user.deleteMany();
 
@@ -239,6 +241,9 @@ async function main() {
   // -- tool policies ---------------------------------------------------------
   // Shared with ensureToolPolicies() so seeded and upgraded installs agree.
   await db.toolPolicy.createMany({ data: DEFAULT_TOOL_POLICIES });
+
+  // -- SLA policies ----------------------------------------------------------
+  await db.slaPolicy.createMany({ data: DEFAULT_SLA_POLICIES });
 
   // -- sandbox ops database --------------------------------------------------
   for (const table of [
@@ -833,16 +838,28 @@ async function main() {
   };
   const tierFor = (p: string) =>
     p === "URGENT" ? "SENIOR" : p === "HIGH" ? "MID" : "JUNIOR";
+  const slaByPriority = new Map(DEFAULT_SLA_POLICIES.map((p) => [p.priority, p]));
   const allTickets = await db.ticket.findMany({
-    select: { id: true, category: true, priority: true },
+    select: { id: true, category: true, priority: true, createdAt: true },
   });
   for (const t of allTickets) {
     const groupId = groupByCategory[t.category];
+    const sla = slaByPriority.get(t.priority as (typeof DEFAULT_SLA_POLICIES)[number]["priority"]);
     await db.ticket.update({
       where: { id: t.id },
       data: {
         ...(groupId ? { groupId } : {}),
         escalationLevel: tierFor(t.priority),
+        ...(sla
+          ? {
+              responseDueAt: new Date(
+                t.createdAt.getTime() + sla.responseMinutes * 60_000,
+              ),
+              resolutionDueAt: new Date(
+                t.createdAt.getTime() + sla.resolutionMinutes * 60_000,
+              ),
+            }
+          : {}),
       },
     });
   }

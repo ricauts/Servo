@@ -3,6 +3,7 @@ import { getInboundConfig, ingestEmail } from "@/lib/inbound-email";
 import { getAiSettings } from "@/lib/ai/settings";
 import { runTriage } from "@/lib/ai/engine";
 import { notifyTicketCreated } from "@/lib/notify";
+import { applySlaToTicket } from "@/lib/sla";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (result.action === "created") {
+    await applySlaToTicket(result.ticketId);
     void notifyTicketCreated(result.ticketId);
     const { autoTriage } = await getAiSettings();
     if (autoTriage) {

@@ -4,6 +4,7 @@
 import { db } from "@/lib/db";
 import { CATEGORIES, PRIORITIES } from "@/lib/types";
 import type { KpiResponse } from "@/lib/types";
+import { evaluateSla } from "@/lib/sla-rules";
 
 /** Compact user shape embedded in ticket list/detail payloads. */
 export const userSummarySelect = {
@@ -70,7 +71,16 @@ export async function getKpis(): Promise<KpiResponse> {
   const [openTickets, resolved30, created30, allApprovals] = await Promise.all([
     db.ticket.findMany({
       where: { status: { notIn: ["RESOLVED", "CLOSED"] } },
-      select: { category: true, priority: true },
+      select: {
+        category: true,
+        priority: true,
+        status: true,
+        createdAt: true,
+        firstResponseAt: true,
+        resolvedAt: true,
+        responseDueAt: true,
+        resolutionDueAt: true,
+      },
     }),
     db.ticket.findMany({
       where: { resolvedAt: { gte: since } },
@@ -175,6 +185,9 @@ export async function getKpis(): Promise<KpiResponse> {
       avgResolutionHours,
       aiResolutionRate,
       pendingApprovals: approvalStats.pending,
+      slaBreached: openTickets.filter(
+        (t) => evaluateSla(t, now).state === "breached",
+      ).length,
     },
     createdByDay: [...byDay.values()],
     byCategory: CATEGORIES.map((category) => ({

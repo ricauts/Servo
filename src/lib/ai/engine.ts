@@ -22,6 +22,7 @@ import {
 } from "@/lib/escalation";
 import { pickAgentProfile, profileAllowsTool } from "@/lib/agent-profiles";
 import { notifyApprovalPending } from "@/lib/notify";
+import { applySlaToTicket } from "@/lib/sla";
 import { qaPrompt, qaSystem, resolverSystem, triageSystem, triageUser } from "./prompts";
 import { getProvider, type ChatProvider, type ToolSpec } from "./provider";
 import { getAiSettings, type AiSettings } from "./settings";
@@ -268,6 +269,8 @@ export async function runTriage(ticketId: string): Promise<AgentRun> {
             : {}),
       },
     });
+    // Triage usually changes the priority, so the SLA clock re-baselines.
+    await applySlaToTicket(ticketId);
     await db.comment.create({
       data: {
         ticketId,

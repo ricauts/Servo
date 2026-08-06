@@ -251,6 +251,25 @@ override for GitHub Enterprise or testing. `POST /api/settings/test-github`
 verifies a token with `GET /user`. Tool errors come back as descriptive
 strings so the agent can adapt instead of crashing the run.
 
+## SLA and auto-escalation
+
+`SlaPolicy` holds a response and a resolution target per priority plus an
+`escalateOnBreach` switch; `DEFAULT_SLA_POLICIES` (`src/lib/sla-rules.ts`)
+seeds them and `ensureSlaPolicies()` backfills on upgrade, mirroring the
+tool-policy pattern. Tickets store `responseDueAt` / `resolutionDueAt`,
+recomputed from **creation** whenever the priority changes (including by
+triage), so re-prioritising re-baselines the clock instead of extending it.
+
+`evaluateSla()` is pure and shared by the server and the badges: the
+response clock governs until the first reply, then the resolution clock
+takes over; resolved tickets report met or breached. `runSlaScan()`
+escalates breached tickets one tier inside their group, reusing
+`pickGroupAssignee()` so the least-loaded eligible member picks it up, and
+writes a SYSTEM comment. `slaEscalatedAt` makes it idempotent — a ticket
+escalates once per breach, and a scheduler can call
+`POST /api/sla/scan` as often as it likes (admin session, or the
+`SLA_SCAN_SECRET` header for unattended runs).
+
 ## Inbound email
 
 `POST /api/inbound/email` (`src/lib/inbound-email.ts`) ingests messages from

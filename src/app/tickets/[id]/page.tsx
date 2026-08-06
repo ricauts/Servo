@@ -8,6 +8,7 @@ import Avatar from "@/components/legacy/Avatar";
 import Badge from "@/components/legacy/Badge";
 import Timeline from "@/components/tickets/Timeline";
 import EscalatePanel from "@/components/tickets/EscalatePanel";
+import SlaBadge from "@/components/tickets/SlaBadge";
 import PendingApprovalCard from "@/components/tickets/PendingApprovalCard";
 import PropertiesPanel from "@/components/tickets/PropertiesPanel";
 import RelativeTime from "@/components/tickets/RelativeTime";
@@ -101,6 +102,7 @@ export default async function TicketDetailPage({
             {CATEGORY_LABEL[ticket.category as Category] ?? ticket.category}
           </Badge>
           {ticket.group && <Badge tone="brand">{ticket.group.name}</Badge>}
+          <SlaBadge ticket={ticket} showKind />
           <span className="ml-1 flex items-center gap-1.5">
             <Avatar
               name={ticket.requester.name}

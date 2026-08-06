@@ -7,6 +7,7 @@ import { ticketDetailInclude } from "@/lib/tickets";
 import type { Prisma } from "@prisma/client";
 import { runResolver } from "@/lib/ai/engine";
 import { notifyTicketResolved } from "@/lib/notify";
+import { applySlaToTicket } from "@/lib/sla";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -92,6 +93,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   const updated = await db.ticket.update({ where: { id }, data });
+
+  if (patch.priority !== undefined && patch.priority !== ticket.priority) {
+    await applySlaToTicket(id);
+  }
 
   if (patch.status === "RESOLVED" && ticket.status !== "RESOLVED") {
     void notifyTicketResolved(id);

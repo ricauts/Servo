@@ -81,6 +81,11 @@ export default async function TicketsPage({
     assigneeColor: ticket.assignee?.color ?? null,
     assigneeIsAi: ticket.assignee?.role === "AI_AGENT",
     updatedAt: ticket.updatedAt.toISOString(),
+    createdAt: ticket.createdAt.toISOString(),
+    firstResponseAt: ticket.firstResponseAt?.toISOString() ?? null,
+    resolvedAt: ticket.resolvedAt?.toISOString() ?? null,
+    responseDueAt: ticket.responseDueAt?.toISOString() ?? null,
+    resolutionDueAt: ticket.resolutionDueAt?.toISOString() ?? null,
   }));
 
   return (

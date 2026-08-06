@@ -52,7 +52,7 @@ export default async function DashboardPage() {
       />
       <div className="grid grid-cols-12 gap-3 p-4 md:px-8 md:py-5">
         {/* Stat tile row */}
-        <div className="col-span-12 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <div className="col-span-12 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
           <StatTile label="Open tickets" value={String(totals.open)} />
           <StatTile
             label="Resolved · 30d"
@@ -85,6 +85,12 @@ export default async function DashboardPage() {
             label="Pending approvals"
             value={String(totals.pendingApprovals)}
             highlight={totals.pendingApprovals > 0}
+          />
+          <StatTile
+            label="SLA breached"
+            value={String(totals.slaBreached)}
+            highlight={totals.slaBreached > 0}
+            tone="critical"
           />
         </div>
 

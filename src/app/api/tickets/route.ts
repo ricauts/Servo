@@ -9,6 +9,7 @@ import type { Prisma } from "@prisma/client";
 import { runTriage } from "@/lib/ai/engine";
 import { getAiSettings } from "@/lib/ai/settings";
 import { notifyTicketCreated } from "@/lib/notify";
+import { applySlaToTicket } from "@/lib/sla";
 
 export async function GET(req: NextRequest) {
   await getCurrentUser();
@@ -83,6 +84,7 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  await applySlaToTicket(ticket.id);
   void notifyTicketCreated(ticket.id);
 
   // getAiSettings supplies the same default (true when the row is missing)

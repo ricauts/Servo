@@ -23,6 +23,7 @@ Bring your own Anthropic API key for real model calls — or run entirely offlin
 - **Automated QA review** — after a run that executed medium/high-risk tools, a QA agent reviews the transcript and issues a PASS/FAIL verdict; failures reassign the ticket to a human with an explanatory comment.
 - **KPI dashboard** — open tickets, resolution times, first-response times, AI-vs-human resolution split, approval stats, ticket volume over 30 days.
 - **BYOK with offline mock mode** — plug in an Anthropic API key via Settings or environment variable, or run fully offline with the deterministic mock provider.
+- **SLA targets with automatic escalation** — per-priority response and resolution targets (editable in Settings). Every ticket carries live SLA state on the queue and detail views, the dashboard tracks breaches, and a scan escalates missed targets one tier up the group hierarchy — assigning the least-loaded eligible member and logging why. Schedule `POST /api/sla/scan` to run it unattended.
 - **Groups & escalation hierarchy** — assignment groups (Development, Analytics, Engineering…) own ticket categories; members carry JUNIOR → MID → SENIOR tiers per group, or STANDALONE for specialists outside the ladder. Priority sets the minimum tier, and any agent can escalate a ticket up a tier or across to another group — the least-loaded eligible member picks it up and the move is logged on the timeline.
 - **Real Azure integration (read-only)** — a service principal with `Reader` is enough: `azure_list_resources` runs live Resource Manager queries (subscription-wide or scoped to a resource group), with a Test-connection button that acquires a token and lists resources. Mutating cloud actions stay simulated behind the approval gate.
 - **Real GitHub integration** — add a personal access token (env `GITHUB_TOKEN` or Settings, with a Test-token button) and `github_create_repo` / `github_open_pr` hit the real GitHub API — still behind their risk levels and approval gates. Without a token they stay simulated so the offline demo keeps working. A base-URL override supports GitHub Enterprise.
@@ -149,7 +150,6 @@ docs/
 - Real AWS and GCP integrations, and Azure write operations (GitHub and read-only Azure already work with credentials)
 - OpenAI-compatible providers alongside Anthropic (Anthropic-compatible endpoints like Z.AI already work via the Base URL setting)
 - SSO and real RBAC (the current roles/permissions are a demo matrix)
-- SLA tracking and time-based auto-escalation (manual tier/group escalation already works)
 - Webhooks and an events API
 - Email/Slack notifications
 

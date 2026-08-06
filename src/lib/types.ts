@@ -112,6 +112,7 @@ export interface KpiResponse {
     avgResolutionHours: number | null;
     aiResolutionRate: number; // 0..1 over resolved tickets last 30d
     pendingApprovals: number;
+    slaBreached: number; // open tickets past their active SLA target
   };
   createdByDay: { date: string; created: number; resolved: number }[]; // last 30 days, date = "YYYY-MM-DD"
   byCategory: { category: Category; count: number }[]; // open + in-flight tickets
