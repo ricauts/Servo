@@ -33,6 +33,7 @@ export interface AiSettingsView {
 
 const PROVIDER_OPTIONS = [
   { value: "anthropic", label: "Anthropic (or compatible)" },
+  { value: "zai", label: "Z.AI (GLM)" },
   { value: "openai", label: "OpenAI-compatible" },
   { value: "mock", label: "Mock (offline)" },
 ];
@@ -47,15 +48,15 @@ const PRESETS: {
   model: string;
 }[] = [
   { id: "anthropic", label: "Anthropic", provider: "anthropic", baseUrl: "", model: "claude-opus-5" },
-  { id: "zai-anthropic", label: "Z.AI GLM — Anthropic-compatible", provider: "anthropic", baseUrl: "https://api.z.ai/api/anthropic", model: "glm-5.2" },
+  { id: "zai", label: "Z.AI GLM", provider: "zai", baseUrl: "", model: "glm-5.2" },
   { id: "openai", label: "OpenAI", provider: "openai", baseUrl: "", model: "gpt-5.1" },
   { id: "azure", label: "Azure OpenAI", provider: "openai", baseUrl: "https://<resource>.openai.azure.com/openai/v1", model: "<deployment-name>" },
-  { id: "zai-openai", label: "Z.AI GLM — OpenAI-compatible", provider: "openai", baseUrl: "https://api.z.ai/api/paas/v4", model: "glm-5.2" },
   { id: "ollama", label: "Ollama (local, keyless)", provider: "openai", baseUrl: "http://localhost:11434/v1", model: "llama3.3" },
 ];
 
 const ENV_VAR: Record<string, string> = {
   anthropic: "ANTHROPIC_API_KEY",
+  zai: "ZAI_API_KEY",
   openai: "OPENAI_API_KEY",
 };
 
@@ -171,6 +172,9 @@ export default function AiProviderForm({ initial }: { initial: AiSettingsView })
         ? "A key is stored in Settings."
         : provider === "openai"
           ? `No key configured. Set ${envVar}, paste a key here, or use a keyless local endpoint via the base URL (e.g. Ollama).`
+          
+          : provider === "zai"
+            ? `No key configured. Set ${envVar} or paste your Z.AI key here — until then Servo runs on the mock provider.`
           : provider === "anthropic"
             ? `No key configured. Set ${envVar} or paste a key here — until then Servo runs on the mock provider.`
             : "The mock provider needs no key.";
@@ -250,7 +254,7 @@ export default function AiProviderForm({ initial }: { initial: AiSettingsView })
             id="ai-model"
             value={model}
             onChange={(e) => setModel(e.target.value)}
-            placeholder={provider === "openai" ? "gpt-5.1" : "claude-opus-5"}
+            placeholder={provider === "openai" ? "gpt-5.1" : provider === "zai" ? "glm-5.2" : "claude-opus-5"}
             disabled={busy}
           />
         </div>
@@ -266,7 +270,9 @@ export default function AiProviderForm({ initial }: { initial: AiSettingsView })
             placeholder={
               provider === "openai"
                 ? "https://api.openai.com/v1"
-                : "https://api.anthropic.com"
+                : provider === "zai"
+                  ? "https://api.z.ai/api/anthropic (default)"
+                  : "https://api.anthropic.com"
             }
             disabled={busy}
           />

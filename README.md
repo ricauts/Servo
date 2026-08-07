@@ -66,7 +66,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). The database is SQLite — no external services needed.
 
-Run the unit tests with `npm test` (vitest — pure rules: SLA clocks, escalation tiers, webhook signing).
+Run the unit tests with `npm test`, the RBAC matrix with `node scripts/permissions-audit.mjs`, and the responsive check with `node scripts/responsive-audit.mjs` (both need the dev server running).
 
 ### Run with Docker
 
@@ -86,8 +86,9 @@ For real model calls Servo speaks **two provider dialects**, configurable in **S
 
 | Provider kind | Works with | Env var | Example |
 |---|---|---|---|
-| `anthropic` | Anthropic API + Anthropic-compatible endpoints | `ANTHROPIC_API_KEY` | Z.AI GLM: base URL `https://api.z.ai/api/anthropic`, model `glm-5.2` |
-| `openai` | Any OpenAI-compatible Chat Completions endpoint | `OPENAI_API_KEY` | OpenAI (`gpt-5.1`), Azure OpenAI (`https://<resource>.openai.azure.com/openai/v1`), Z.AI (`https://api.z.ai/api/paas/v4`), vLLM, **Ollama keyless** (`http://localhost:11434/v1`) |
+| `anthropic` | Anthropic API + Anthropic-compatible endpoints | `ANTHROPIC_API_KEY` | base URL override for any compatible endpoint |
+| `zai` | Z.AI GLM models — first-class provider | `ZAI_API_KEY` | model `glm-5.2`; endpoint preconfigured, no base URL needed |
+| `openai` | Any OpenAI-compatible Chat Completions endpoint | `OPENAI_API_KEY` | OpenAI (`gpt-5.1`), Azure OpenAI (`https://<resource>.openai.azure.com/openai/v1`), vLLM, **Ollama keyless** (`http://localhost:11434/v1`) |
 
 Notes:
 

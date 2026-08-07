@@ -28,14 +28,14 @@ export default function PriorityBars({
 
   if (total === 0) {
     return (
-      <div className="flex h-[180px] items-center justify-center font-sans text-sm text-muted-foreground">
+      <div className="flex h-[clamp(120px,19vh,180px)] items-center justify-center font-sans text-sm text-muted-foreground">
         No open tickets right now.
       </div>
     );
   }
 
   return (
-    <ChartContainer config={config} className="aspect-auto h-[180px] w-full">
+    <ChartContainer config={config} className="aspect-auto h-[180px] w-full xl:h-full xl:min-h-0">
       <BarChart data={rows} layout="vertical" margin={{ left: 4, right: 28 }}>
         <CartesianGrid horizontal={false} />
         <XAxis type="number" hide />

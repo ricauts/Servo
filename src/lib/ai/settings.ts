@@ -9,12 +9,18 @@ import { SETTING_KEYS } from "@/lib/types";
 
 /**
  * - `anthropic` — the Anthropic API or any Anthropic-compatible endpoint
- *   (e.g. Z.AI) via the base URL.
+ *   via the base URL.
+ * - `zai` — Z.AI's GLM models as a first-class provider (own key env var
+ *   and default endpoint; no base URL needed).
  * - `openai` — any OpenAI-compatible Chat Completions endpoint: OpenAI,
- *   Azure OpenAI, Ollama, vLLM, Z.AI's OpenAI-style API, …
+ *   Azure OpenAI, Ollama, vLLM, …
  * - `mock` — deterministic offline provider (the default).
  */
-export type AiProviderKind = "anthropic" | "openai" | "mock";
+export type AiProviderKind = "anthropic" | "zai" | "openai" | "mock";
+
+/** Z.AI's native endpoint, used when the zai provider has no base URL. */
+export const ZAI_DEFAULT_BASE_URL = "https://api.z.ai/api/anthropic";
+export const ZAI_DEFAULT_MODEL = "glm-5.2";
 
 export interface AiSettings {
   /** Effective provider after the no-credentials fallback to mock. */
@@ -34,12 +40,13 @@ export const DEFAULT_MODEL = "claude-opus-5";
 /** The env var consulted for each provider kind. */
 export function envKeyNameFor(provider: AiProviderKind): string | null {
   if (provider === "anthropic") return "ANTHROPIC_API_KEY";
+  if (provider === "zai") return "ZAI_API_KEY";
   if (provider === "openai") return "OPENAI_API_KEY";
   return null;
 }
 
 function isProviderKind(v: string | undefined): v is AiProviderKind {
-  return v === "anthropic" || v === "openai" || v === "mock";
+  return v === "anthropic" || v === "zai" || v === "openai" || v === "mock";
 }
 
 /**
@@ -52,7 +59,7 @@ export function providerUsable(p: {
   baseUrl?: string;
 }): boolean {
   if (p.provider === "mock") return true;
-  if (p.apiKey) return true;
+  if (p.apiKey) return true; // zai/anthropic always need a key
   return p.provider === "openai" && Boolean(p.baseUrl);
 }
 

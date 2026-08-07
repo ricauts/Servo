@@ -6,7 +6,12 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { ContentBlock, ConversationMessage } from "@/lib/types";
 import { MockProvider, type MockContext } from "./mock";
-import { providerUsable, type AiSettings } from "./settings";
+import {
+  providerUsable,
+  ZAI_DEFAULT_BASE_URL,
+  ZAI_DEFAULT_MODEL,
+  type AiSettings,
+} from "./settings";
 
 export interface ToolSpec {
   name: string;
@@ -225,6 +230,15 @@ class OpenAiCompatibleProvider implements ChatProvider {
 export function getRealProvider(settings: AiSettings): ChatProvider | null {
   if (!providerUsable(settings)) return null;
   if (settings.provider === "anthropic") return new AnthropicProvider(settings);
+  if (settings.provider === "zai") {
+    // Z.AI is a first-class provider with its own defaults; it speaks the
+    // Anthropic wire dialect under the hood.
+    return new AnthropicProvider({
+      ...settings,
+      baseUrl: settings.baseUrl || ZAI_DEFAULT_BASE_URL,
+      model: settings.model || ZAI_DEFAULT_MODEL,
+    });
+  }
   if (settings.provider === "openai") return new OpenAiCompatibleProvider(settings);
   return null;
 }

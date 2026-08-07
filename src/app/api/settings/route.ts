@@ -55,7 +55,7 @@ export async function GET() {
 }
 
 const putSchema = z.object({
-  provider: z.enum(["anthropic", "openai", "mock"]).optional(),
+  provider: z.enum(["anthropic", "zai", "openai", "mock"]).optional(),
   apiKey: z.string().optional(), // empty string clears the stored key
   baseUrl: z.string().optional(),
   model: z.string().optional(),

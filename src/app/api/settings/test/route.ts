@@ -12,7 +12,7 @@ import {
 export const dynamic = "force-dynamic";
 
 const testSchema = z.object({
-  provider: z.enum(["anthropic", "openai", "mock"]),
+  provider: z.enum(["anthropic", "zai", "openai", "mock"]),
   // Optional overrides so the form can test unsaved values. When apiKey is
   // omitted, the stored/env key is used.
   apiKey: z.string().optional(),
