@@ -9,6 +9,7 @@
 
 import { db } from "@/lib/db";
 import { nextTicketNumber } from "@/lib/tickets";
+import { getSmtpConfig } from "@/lib/notify";
 
 export const INBOUND_SETTING_KEYS = {
   enabled: "integration.inbound.enabled",
@@ -123,6 +124,24 @@ export type InboundResult =
 export async function ingestEmail(message: InboundMessage): Promise<InboundResult> {
   const email = parseSenderEmail(message.from);
   if (!email) return { action: "ignored", reason: "Unparseable sender address." };
+
+  // Self-loop guard: when the intake mailbox is also the notification sender
+  // (the common Gmail setup), Servo's own outbound mail must never bounce
+  // back in as tickets/comments. Gmail rewrites the From header to the
+  // authenticated account, so the SMTP URL's username counts as "own" too.
+  const smtp = await getSmtpConfig();
+  const own = new Set<string>();
+  const fromAddress = parseSenderEmail(smtp.from);
+  if (fromAddress) own.add(fromAddress);
+  try {
+    const url = new URL(smtp.url);
+    if (url.username) own.add(decodeURIComponent(url.username).toLowerCase());
+  } catch {
+    /* unparseable SMTP URL — guard falls back to the From address only */
+  }
+  if (own.has(email)) {
+    return { action: "ignored", reason: "Own notification address." };
+  }
 
   const body = stripQuotedReply(message.text ?? "");
   if (!body) return { action: "ignored", reason: "Empty message body." };

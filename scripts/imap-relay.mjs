@@ -82,6 +82,9 @@ async function run() {
   const lock = await client.getMailboxLock("INBOX");
   try {
     for (;;) {
+      // A long-lived session goes stale without traffic: Gmail (and most
+      // servers) only reveal new messages/flag changes after a NOOP.
+      await client.noop();
       await processUnseen(client);
       await new Promise((r) => setTimeout(r, config.pollSeconds * 1000));
     }
