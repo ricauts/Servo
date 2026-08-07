@@ -7,6 +7,7 @@ import { getSmtpConfig } from "@/lib/notify";
 import { getGithubConfig, GITHUB_SETTING_KEYS } from "@/lib/integrations/github";
 import { azureConfigured, getAzureConfig, AZURE_SETTING_KEYS } from "@/lib/integrations/azure";
 import { getInboundConfig, INBOUND_SETTING_KEYS } from "@/lib/inbound-email";
+import { AUTH_SETTING_KEYS } from "@/lib/authjs";
 import { forbid } from "@/lib/permissions";
 import { SETTING_KEYS } from "@/lib/types";
 
@@ -20,6 +21,7 @@ async function settingsPayload() {
     if (row.key === GITHUB_SETTING_KEYS.token) continue; // never leak the token
     if (row.key === AZURE_SETTING_KEYS.clientSecret) continue; // never leak the secret
     if (row.key === INBOUND_SETTING_KEYS.secret) continue; // never leak the secret
+    if (row.key === AUTH_SETTING_KEYS.clientSecret) continue; // never leak the secret
     settings[row.key] = row.value;
   }
   const [ai, smtp, github, azure, inbound] = await Promise.all([
@@ -73,6 +75,11 @@ const putSchema = z.object({
   azureSubscriptionId: z.string().optional(),
   inboundEnabled: z.boolean().optional(),
   inboundSecret: z.string().optional(), // empty string clears the stored secret
+  authIssuer: z.string().optional(),
+  authClientId: z.string().optional(),
+  authClientSecret: z.string().optional(), // empty string disables SSO
+  authProviderName: z.string().optional(),
+  authAdminEmails: z.string().optional(),
 });
 
 /** PUT /api/settings — upsert any subset of the AI settings (admin only). */
@@ -131,6 +138,11 @@ export async function PUT(req: NextRequest) {
   if (data.inboundSecret !== undefined) {
     updates.push({ key: INBOUND_SETTING_KEYS.secret, value: data.inboundSecret });
   }
+  if (data.authIssuer !== undefined) updates.push({ key: AUTH_SETTING_KEYS.issuer, value: data.authIssuer });
+  if (data.authClientId !== undefined) updates.push({ key: AUTH_SETTING_KEYS.clientId, value: data.authClientId });
+  if (data.authClientSecret !== undefined) updates.push({ key: AUTH_SETTING_KEYS.clientSecret, value: data.authClientSecret });
+  if (data.authProviderName !== undefined) updates.push({ key: AUTH_SETTING_KEYS.providerName, value: data.authProviderName });
+  if (data.authAdminEmails !== undefined) updates.push({ key: AUTH_SETTING_KEYS.adminEmails, value: data.authAdminEmails });
 
   for (const update of updates) {
     await db.setting.upsert({

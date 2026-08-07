@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Inbox,
   ShieldCheck,
+  Plug,
   Settings2,
   Users2,
   type LucideIcon,
@@ -24,11 +25,14 @@ interface NavItem {
 export default function SidebarNav({
   counts,
   showTeamNav = false,
+  showIntegrations = false,
   onNavigate,
 }: {
   counts: { tickets: number; approvals: number };
   /** Groups/Agents are only visible to admin and agent roles. */
   showTeamNav?: boolean;
+  /** Integrations are admin-only. */
+  showIntegrations?: boolean;
   /** Called when a nav link is clicked (used to close the mobile sheet). */
   onNavigate?: () => void;
 }) {
@@ -55,6 +59,9 @@ export default function SidebarNav({
           { href: "/groups", label: "Groups", icon: Users2 } as NavItem,
           { href: "/agents", label: "Agents", icon: Bot } as NavItem,
         ]
+      : []),
+    ...(showIntegrations
+      ? [{ href: "/integrations", label: "Integrations", icon: Plug } as NavItem]
       : []),
     { href: "/settings", label: "Settings", icon: Settings2 },
   ];

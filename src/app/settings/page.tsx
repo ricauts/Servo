@@ -30,24 +30,12 @@ import ToolPolicyTable, {
 import CustomToolsManager, {
   type CustomToolView,
 } from "@/components/admin/CustomToolsManager";
-import SmtpForm, { type SmtpSettingsView } from "@/components/admin/SmtpForm";
-import GithubForm, { type GithubSettingsView } from "@/components/admin/GithubForm";
-import AzureForm, { type AzureSettingsView } from "@/components/admin/AzureForm";
-import InboundEmailForm, {
-  type InboundSettingsView,
-} from "@/components/admin/InboundEmailForm";
-import { getSmtpConfig } from "@/lib/notify";
-import { getInboundConfig } from "@/lib/inbound-email";
 import { ensureSlaPolicies } from "@/lib/sla";
-import WebhooksManager, {
-  type WebhookView,
-} from "@/components/admin/WebhooksManager";
+import RoleSelect from "@/components/admin/RoleSelect";
 import SlaPolicyTable, {
   type SlaPolicyView,
 } from "@/components/admin/SlaPolicyTable";
 import { PRIORITIES } from "@/lib/types";
-import { getGithubConfig } from "@/lib/integrations/github";
-import { azureConfigured, getAzureConfig } from "@/lib/integrations/azure";
 
 export const dynamic = "force-dynamic";
 
@@ -80,37 +68,14 @@ export default async function SettingsPage() {
   }
 
   await ensureSlaPolicies();
-  const [ai, smtp, inbound, github, azure, toolPolicies, customTools, users, slaPolicies] =
+  const [ai, toolPolicies, customTools, users, slaPolicies] =
     await Promise.all([
-    getAiSettings(),
-    getSmtpConfig(),
-    getInboundConfig(),
-    getGithubConfig(),
-    getAzureConfig(),
+      getAiSettings(),
       db.toolPolicy.findMany({ orderBy: { toolName: "asc" } }),
       db.customTool.findMany({ orderBy: { createdAt: "asc" } }),
       db.user.findMany({ orderBy: { createdAt: "asc" } }),
       db.slaPolicy.findMany(),
     ]);
-
-  const webhookRows = await db.webhook.findMany({
-    include: { deliveries: { orderBy: { createdAt: "desc" }, take: 5 } },
-    orderBy: { createdAt: "asc" },
-  });
-  const webhookViews: WebhookView[] = webhookRows.map((hook) => ({
-    id: hook.id,
-    url: hook.url,
-    events: JSON.parse(hook.events) as string[],
-    enabled: hook.enabled,
-    deliveries: hook.deliveries.map((d) => ({
-      id: d.id,
-      event: d.event,
-      ok: d.ok,
-      statusCode: d.statusCode,
-      error: d.error,
-      durationMs: d.durationMs,
-    })),
-  }));
 
   const slaByPriority = new Map(slaPolicies.map((p) => [p.priority, p]));
   const slaViews: SlaPolicyView[] = PRIORITIES.flatMap((priority) => {
@@ -126,34 +91,6 @@ export default async function SettingsPage() {
         ]
       : [];
   });
-
-  const inboundSettings: InboundSettingsView = {
-    enabled: inbound.enabled,
-    secretSet: inbound.secret.length > 0,
-    secretSource: inbound.secretSource,
-  };
-
-  const azureSettings: AzureSettingsView = {
-    tenantId: azure.tenantId,
-    clientId: azure.clientId,
-    subscriptionId: azure.subscriptionId,
-    secretSet: azure.clientSecret.length > 0,
-    secretSource: azure.secretSource,
-    configured: azureConfigured(azure),
-  };
-
-  const githubSettings: GithubSettingsView = {
-    owner: github.owner,
-    tokenSet: github.token.length > 0,
-    tokenSource: github.tokenSource,
-  };
-
-  const smtpSettings: SmtpSettingsView = {
-    enabled: smtp.enabled,
-    from: smtp.from,
-    urlSet: smtp.url.length > 0,
-    urlSource: smtp.urlSource,
-  };
 
   const aiSettings: AiSettingsView = {
     provider: ai.configuredProvider,
@@ -204,7 +141,6 @@ export default async function SettingsPage() {
           <TabsTrigger value="ai">AI provider</TabsTrigger>
           <TabsTrigger value="tools">Tools</TabsTrigger>
           <TabsTrigger value="sla">SLA</TabsTrigger>
-          <TabsTrigger value="integrations">Integrations</TabsTrigger>
           <TabsTrigger value="team">Team</TabsTrigger>
         </TabsList>
 
@@ -250,53 +186,6 @@ export default async function SettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="integrations" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Email notifications (SMTP)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <SmtpForm initial={smtpSettings} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Inbound email (tickets from a mailbox)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <InboundEmailForm initial={inboundSettings} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>GitHub integration</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <GithubForm initial={githubSettings} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Azure integration (read-only)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <AzureForm initial={azureSettings} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Outbound webhooks</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <WebhooksManager webhooks={webhookViews} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         <TabsContent value="team">
         <Card>
           <CardHeader>
@@ -324,9 +213,13 @@ export default async function SettingsPage() {
                     </span>
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <Badge tone={ROLE_TONE[u.role] ?? "neutral"}>
-                      {u.role.replace("_", " ")}
-                    </Badge>
+                    {u.role !== "AI_AGENT" && u.id !== user.id ? (
+                      <RoleSelect userId={u.id} role={u.role} />
+                    ) : (
+                      <Badge tone={ROLE_TONE[u.role] ?? "neutral"}>
+                        {u.role.replace("_", " ")}
+                      </Badge>
+                    )}
                     {u.role === "AI_AGENT" && u.aiKind && (
                       <Badge tone="neutral">{u.aiKind}</Badge>
                     )}
@@ -336,7 +229,7 @@ export default async function SettingsPage() {
             </ul>
             <Separator />
             <p className="font-body text-sm text-muted-foreground">
-              Read-only in this POC — users are seeded for the demo.
+              Admins can change team roles here; new SSO sign-ins start as REQUESTER.
             </p>
           </CardContent>
         </Card>

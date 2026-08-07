@@ -23,11 +23,15 @@ interface SwitcherUser {
 export default function MobileTopbar({
   counts,
   showTeamNav = false,
+  showIntegrations = false,
+  hideSwitcher = false,
   users,
   currentUserId,
 }: {
   counts: { tickets: number; approvals: number };
   showTeamNav?: boolean;
+  showIntegrations?: boolean;
+  hideSwitcher?: boolean;
   users: SwitcherUser[];
   currentUserId: string;
 }) {
@@ -57,11 +61,14 @@ export default function MobileTopbar({
           <SidebarNav
             counts={counts}
             showTeamNav={showTeamNav}
+            showIntegrations={showIntegrations}
             onNavigate={() => setOpen(false)}
           />
-          <div className="mt-auto border-t border-sidebar-border p-3">
-            <UserSwitcher users={users} currentUserId={currentUserId} />
-          </div>
+          {!hideSwitcher && (
+            <div className="mt-auto border-t border-sidebar-border p-3">
+              <UserSwitcher users={users} currentUserId={currentUserId} />
+            </div>
+          )}
         </SheetContent>
       </Sheet>
 

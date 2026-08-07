@@ -78,6 +78,12 @@ The container creates and seeds its SQLite databases on a named volume (`/data`)
 
 `npm run setup` seeds ~28 tickets across the last 30 days, completed AI runs with full step traces, and two runs currently paused waiting for approval, so the dashboard and approvals inbox are meaningful from the first render. Run `npm run seed` any time to reset the demo data.
 
+## Authentication (SSO / OIDC)
+
+Servo ships with real sign-in for self-hosted deployments: connect any OIDC identity provider (Entra ID, Google, Okta, Keycloak, Auth0...) via env vars or from **Integrations -> Single sign-on**. Users are provisioned on first sign-in (REQUESTER by default; `AUTH_ADMIN_EMAILS` keeps admins), roles are managed from **Settings -> Team**, and a **first-run setup wizard** (`/setup`) bootstraps fresh installs: the first admin, the system AI agents, default policies, and (optionally) your SSO tenant. Without OIDC config Servo stays in the offline demo mode with the user switcher. For local development, `node scripts/mock-idp.mjs you@x.com` starts a throwaway IdP.
+
+Integrations now live on their own page (`/integrations`): SSO, email in/out, GitHub, Azure, and outbound webhooks.
+
 ## Bring your own key (BYOK)
 
 Servo ships in **mock mode** by default: a deterministic provider that scripts realistic tool-using conversations from the ticket text, so triage, resolution, approvals, and QA all work with no API key and no network access.
