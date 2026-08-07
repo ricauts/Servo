@@ -14,7 +14,7 @@ banner).
 
 | Role | Light | Dark | Rule |
 |---|---|---|---|
-| `background` / `card` | green-tinted paper `oklch(0.988 0.004 160)` / white | deep blue-charcoal `0.15` / `0.2` | Page vs elevated surface |
+| `background` / `card` | green-tinted paper `oklch(0.988 0.004 160)` / white | neutral green-grey charcoal `oklch(0.15 0.006 170)` / `0.2` — greys harmonize with the green sidebar | Page vs elevated surface |
 | `foreground` | dark green-gray `0.35` | near-white `0.95` | Body text (≥ 10:1) |
 | `muted` / `muted-foreground` | cool gray `0.9` / `0.47` | `0.3` / `0.68` | Secondary text ≥ 4.5:1 even **on** `muted` |
 | **`primary`** | **Servo green `oklch(0.64 0.165 154)`** | same | **Fills only**: buttons, active bars, count badges. ≥ 3:1 vs page in light |
