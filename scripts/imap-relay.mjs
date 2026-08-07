@@ -1,0 +1,100 @@
+// IMAP → Servo inbound relay: turns any IMAP mailbox (Gmail / Google
+// Workspace, Outlook, Fastmail…) into tickets by forwarding unseen messages
+// to POST /api/inbound/email. Run it next to Servo (or as a container):
+//
+//   IMAP_HOST=imap.gmail.com IMAP_USER=tickets@servoai.org \
+//   IMAP_PASSWORD=<app-password> SERVO_URL=http://localhost:3000 \
+//   INBOUND_EMAIL_SECRET=<shared secret> node scripts/imap-relay.mjs
+//
+// Gmail/Workspace notes: enable IMAP for the mailbox and use an app password
+// (requires 2-Step Verification). Messages are marked \Seen only after Servo
+// accepts them, so a crash never loses mail.
+
+import { ImapFlow } from "imapflow";
+import { simpleParser } from "mailparser";
+
+const config = {
+  host: process.env.IMAP_HOST ?? "imap.gmail.com",
+  port: Number(process.env.IMAP_PORT ?? 993),
+  user: process.env.IMAP_USER ?? "",
+  password: process.env.IMAP_PASSWORD ?? "",
+  servoUrl: (process.env.SERVO_URL ?? "http://localhost:3000").replace(/\/+$/, ""),
+  secret: process.env.INBOUND_EMAIL_SECRET ?? "",
+  pollSeconds: Number(process.env.IMAP_POLL_SECONDS ?? 30),
+};
+
+if (!config.user || !config.password || !config.secret) {
+  console.error(
+    "Missing config: IMAP_USER, IMAP_PASSWORD and INBOUND_EMAIL_SECRET are required.",
+  );
+  process.exit(1);
+}
+
+async function forward(parsed) {
+  const res = await fetch(`${config.servoUrl}/api/inbound/email`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-servo-token": config.secret,
+    },
+    body: JSON.stringify({
+      from: parsed.from?.text ?? "",
+      subject: parsed.subject ?? "",
+      text: parsed.text ?? "",
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`Servo rejected the message (${res.status}): ${body.error ?? ""}`);
+  return body;
+}
+
+async function processUnseen(client) {
+  const uids = await client.search({ seen: false });
+  for (const uid of uids ?? []) {
+    const { content } = await client.download(uid);
+    const chunks = [];
+    for await (const chunk of content) chunks.push(chunk);
+    const parsed = await simpleParser(Buffer.concat(chunks));
+    try {
+      const result = await forward(parsed);
+      await client.messageFlagsAdd(uid, ["\\Seen"]);
+      console.log(
+        `[relay] ${parsed.from?.text ?? "?"} :: "${parsed.subject ?? ""}" -> ${result.action ?? "?"}${result.ticketNumber ? ` #${result.ticketNumber}` : ""}`,
+      );
+    } catch (err) {
+      // Leave unseen so the next pass retries.
+      console.error(`[relay] delivery failed, will retry: ${err.message}`);
+    }
+  }
+}
+
+async function run() {
+  const client = new ImapFlow({
+    host: config.host,
+    port: config.port,
+    secure: true,
+    auth: { user: config.user, pass: config.password },
+    logger: false,
+  });
+  await client.connect();
+  console.log(`[relay] connected to ${config.host} as ${config.user}; polling every ${config.pollSeconds}s`);
+  const lock = await client.getMailboxLock("INBOX");
+  try {
+    for (;;) {
+      await processUnseen(client);
+      await new Promise((r) => setTimeout(r, config.pollSeconds * 1000));
+    }
+  } finally {
+    lock.release();
+  }
+}
+
+for (;;) {
+  try {
+    await run();
+  } catch (err) {
+    console.error(`[relay] connection error: ${err.message} — reconnecting in 30s`);
+    await new Promise((r) => setTimeout(r, 30_000));
+  }
+}
