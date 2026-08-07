@@ -4,6 +4,8 @@
 
 # Servo
 
+[![CI](https://github.com/ricauts/servo/actions/workflows/ci.yml/badge.svg)](https://github.com/ricauts/servo/actions/workflows/ci.yml)
+
 **An open-source, self-hostable AI-powered service desk.** Tickets can be assigned to humans *or* AI agents. AI agents triage incoming tickets, resolve them using real tools (SQL against a sandboxed ops database, device inventory lookups, simulated GitHub and cloud integrations), pause for **human approval** before risky actions, get an automated **QA review** afterwards, and everything feeds a **KPI dashboard**.
 
 <p align="center">
