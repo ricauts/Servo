@@ -8,6 +8,7 @@ import type { Prisma } from "@prisma/client";
 import { runResolver } from "@/lib/ai/engine";
 import { notifyTicketResolved } from "@/lib/notify";
 import { applySlaToTicket } from "@/lib/sla";
+import { emitTicketEvent } from "@/lib/webhooks";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -100,6 +101,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   if (patch.status === "RESOLVED" && ticket.status !== "RESOLVED") {
     void notifyTicketResolved(id);
+    void emitTicketEvent("ticket.resolved", id);
   }
 
   // Side effect: assigning to the RESOLVER AI agent starts a resolver run.

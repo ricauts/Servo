@@ -10,6 +10,7 @@ import { runTriage } from "@/lib/ai/engine";
 import { getAiSettings } from "@/lib/ai/settings";
 import { notifyTicketCreated } from "@/lib/notify";
 import { applySlaToTicket } from "@/lib/sla";
+import { emitTicketEvent } from "@/lib/webhooks";
 
 export async function GET(req: NextRequest) {
   await getCurrentUser();
@@ -86,6 +87,7 @@ export async function POST(req: NextRequest) {
 
   await applySlaToTicket(ticket.id);
   void notifyTicketCreated(ticket.id);
+  void emitTicketEvent("ticket.created", ticket.id);
 
   // getAiSettings supplies the same default (true when the row is missing)
   // that the settings API/UI report, so behavior and display never diverge.

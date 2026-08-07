@@ -9,7 +9,8 @@
     "start": "next start",
     "setup": "prisma generate && prisma db push && tsx prisma/seed.ts",
     "seed": "tsx prisma/seed.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -19,6 +20,7 @@
     "@prisma/client": "^6.3.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
     "gray-matter": "^4.0.3",
     "lucide-react": "^1.28.0",
     "next": "^15.1.6",
@@ -45,6 +47,7 @@
     "puppeteer-core": "^25.4.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.10"
   }
 }

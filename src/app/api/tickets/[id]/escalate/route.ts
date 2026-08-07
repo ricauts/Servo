@@ -8,6 +8,7 @@ import {
   nextLevel,
   pickGroupAssignee,
 } from "@/lib/escalation";
+import { emitTicketEvent } from "@/lib/webhooks";
 
 export const dynamic = "force-dynamic";
 
@@ -118,5 +119,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     return t;
   });
 
+  void emitTicketEvent("ticket.escalated", id, {
+    reason: reason ?? null,
+    trigger: "manual",
+    summary,
+  });
   return Response.json({ ticket: updated });
 }

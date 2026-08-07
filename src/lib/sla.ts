@@ -2,6 +2,7 @@
 
 import { db } from "@/lib/db";
 import { nextLevel, pickGroupAssignee } from "@/lib/escalation";
+import { emitTicketEvent } from "@/lib/webhooks";
 import { DEFAULT_SLA_POLICIES } from "@/lib/sla-rules";
 import type { Priority } from "@/lib/types";
 
@@ -117,6 +118,11 @@ export async function runSlaScan(now: Date = new Date()): Promise<SlaScanResult>
     result.escalated.push({
       ticketId: ticket.id,
       number: ticket.number,
+      from: ticket.escalationLevel,
+      to: next,
+    });
+    void emitTicketEvent("ticket.escalated", ticket.id, {
+      trigger: "sla_breach",
       from: ticket.escalationLevel,
       to: next,
     });

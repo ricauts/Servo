@@ -44,7 +44,13 @@ export default async function Sidebar() {
         showTeamNav={can(user, "group.view")}
       />
 
-        <div className="mt-auto border-t border-sidebar-border p-3">
+        <div className="mt-auto flex flex-col gap-2 border-t border-sidebar-border p-3">
+          <p className="px-2 font-mono text-[10px] uppercase tracking-wider text-sidebar-foreground/50">
+            Search & jump{" "}
+            <kbd className="ml-1 rounded border border-sidebar-border bg-sidebar-accent px-1 py-px text-[9.5px] normal-case text-sidebar-foreground/80">
+              Ctrl K
+            </kbd>
+          </p>
           <UserSwitcher users={users} currentUserId={user.id} />
         </div>
       </aside>

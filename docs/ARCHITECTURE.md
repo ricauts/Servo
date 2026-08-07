@@ -251,6 +251,18 @@ override for GitHub Enterprise or testing. `POST /api/settings/test-github`
 verifies a token with `GET /user`. Tool errors come back as descriptive
 strings so the agent can adapt instead of crashing the run.
 
+## Outbound webhooks
+
+`src/lib/webhooks.ts` streams five events (`ticket.created/resolved/
+escalated`, `approval.pending/decided`) to every enabled `Webhook` whose
+subscription list matches (`["*"]` = all). Payloads are signed with
+HMAC-SHA256 of the raw body (`x-servo-signature: sha256=<hex>`); the secret
+is generated server-side and shown exactly once at creation. Deliveries are
+fire-and-forget with a 10s timeout — the same best-effort contract as email
+— and each attempt lands in a rolling per-endpoint log (`WebhookDelivery`,
+last 20) surfaced in Settings, where a test-ping button exercises an
+endpoint before enabling it.
+
 ## SLA and auto-escalation
 
 `SlaPolicy` holds a response and a resolution target per priority plus an

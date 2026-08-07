@@ -22,6 +22,7 @@ import {
 } from "@/lib/escalation";
 import { pickAgentProfile, profileAllowsTool } from "@/lib/agent-profiles";
 import { notifyApprovalPending } from "@/lib/notify";
+import { emitEvent } from "@/lib/webhooks";
 import { applySlaToTicket } from "@/lib/sla";
 import { qaPrompt, qaSystem, resolverSystem, triageSystem, triageUser } from "./prompts";
 import { getProvider, type ChatProvider, type ToolSpec } from "./provider";
@@ -449,6 +450,14 @@ async function driveResolverLoop(ctx: LoopContext): Promise<"completed" | "pause
           },
         });
         void notifyApprovalPending(approval.id);
+        void emitEvent("approval.pending", {
+          approvalId: approval.id,
+          ticketId: ctx.ticket.id,
+          ticketNumber: ctx.ticket.number,
+          toolName: call.name,
+          riskLevel: policy.riskLevel,
+          toolInput: call.input,
+        });
         await addStep(ctx, {
           type: "APPROVAL_REQUEST",
           toolName: call.name,

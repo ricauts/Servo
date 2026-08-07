@@ -9,6 +9,7 @@ import { opsDb, opsExecute, opsSelect } from "@/lib/opsdb";
 import { createRepo, getGithubConfig, openPr } from "@/lib/integrations/github";
 import { azureConfigured, getAzureConfig, listResources } from "@/lib/integrations/azure";
 import { notifyTicketResolved } from "@/lib/notify";
+import { emitTicketEvent } from "@/lib/webhooks";
 import { jsonSafe } from "@/lib/utils";
 
 export interface ToolContext {
@@ -354,6 +355,7 @@ export const TOOLS: Record<string, ToolDef> = {
         },
       });
       void notifyTicketResolved(ctx.ticketId);
+      void emitTicketEvent("ticket.resolved", ctx.ticketId);
       return "Ticket marked as resolved.";
     },
   },

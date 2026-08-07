@@ -39,6 +39,9 @@ import InboundEmailForm, {
 import { getSmtpConfig } from "@/lib/notify";
 import { getInboundConfig } from "@/lib/inbound-email";
 import { ensureSlaPolicies } from "@/lib/sla";
+import WebhooksManager, {
+  type WebhookView,
+} from "@/components/admin/WebhooksManager";
 import SlaPolicyTable, {
   type SlaPolicyView,
 } from "@/components/admin/SlaPolicyTable";
@@ -89,6 +92,25 @@ export default async function SettingsPage() {
       db.user.findMany({ orderBy: { createdAt: "asc" } }),
       db.slaPolicy.findMany(),
     ]);
+
+  const webhookRows = await db.webhook.findMany({
+    include: { deliveries: { orderBy: { createdAt: "desc" }, take: 5 } },
+    orderBy: { createdAt: "asc" },
+  });
+  const webhookViews: WebhookView[] = webhookRows.map((hook) => ({
+    id: hook.id,
+    url: hook.url,
+    events: JSON.parse(hook.events) as string[],
+    enabled: hook.enabled,
+    deliveries: hook.deliveries.map((d) => ({
+      id: d.id,
+      event: d.event,
+      ok: d.ok,
+      statusCode: d.statusCode,
+      error: d.error,
+      durationMs: d.durationMs,
+    })),
+  }));
 
   const slaByPriority = new Map(slaPolicies.map((p) => [p.priority, p]));
   const slaViews: SlaPolicyView[] = PRIORITIES.flatMap((priority) => {
@@ -262,6 +284,15 @@ export default async function SettingsPage() {
             </CardHeader>
             <CardContent>
               <AzureForm initial={azureSettings} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Outbound webhooks</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <WebhooksManager webhooks={webhookViews} />
             </CardContent>
           </Card>
         </TabsContent>

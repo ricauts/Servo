@@ -42,6 +42,8 @@ async function main() {
   await db.ticket.deleteMany();
   await db.groupMember.deleteMany();
   await db.group.deleteMany();
+  await db.webhookDelivery.deleteMany();
+  await db.webhook.deleteMany();
   await db.toolPolicy.deleteMany();
   await db.slaPolicy.deleteMany();
   await db.setting.deleteMany();

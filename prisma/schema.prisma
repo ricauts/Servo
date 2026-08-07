@@ -190,6 +190,33 @@ model Setting {
   value String
 }
 
+// Outbound webhook endpoint. `events` is a JSON array of subscribed event
+// names, or ["*"] for everything. Payloads are signed with HMAC-SHA256 of the
+// raw body using `secret` (x-servo-signature: sha256=<hex>).
+model Webhook {
+  id        String   @id @default(cuid())
+  url       String
+  secret    String // never returned by the API after creation
+  events    String   @default("[\"*\"]")
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  deliveries WebhookDelivery[]
+}
+
+// One delivery attempt (kept as a short rolling log per webhook).
+model WebhookDelivery {
+  id         String   @id @default(cuid())
+  webhookId  String
+  webhook    Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  event      String
+  ok         Boolean
+  statusCode Int?
+  error      String?
+  durationMs Int
+  createdAt  DateTime @default(now())
+}
+
 // Response/resolution targets per priority. One row per Priority value.
 model SlaPolicy {
   priority          String  @id // LOW | MEDIUM | HIGH | URGENT

@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { resumeAfterApproval } from "@/lib/ai/engine";
 import { canDecideApproval, forbid } from "@/lib/permissions";
+import { emitEvent } from "@/lib/webhooks";
 
 const decisionSchema = z.object({
   decision: z.enum(["APPROVED", "REJECTED"]),
@@ -59,6 +60,16 @@ export async function POST(
       { status: 409 },
     );
   }
+
+  void emitEvent("approval.decided", {
+    approvalId: id,
+    ticketId: approval.ticketId,
+    toolName: approval.toolName,
+    riskLevel: approval.riskLevel,
+    decision: parsed.data.decision,
+    decidedBy: user.name,
+    reason: parsed.data.reason?.trim() || null,
+  });
 
   try {
     const run = await resumeAfterApproval(id);

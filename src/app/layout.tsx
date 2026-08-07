@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Lato, Merriweather, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 import Sidebar from "@/components/shell/Sidebar";
+import CommandPalette from "@/components/shell/CommandPalette";
 import ThemeProvider from "@/components/shell/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
@@ -52,6 +53,7 @@ export default function RootLayout({
             <Sidebar />
             <main className="min-w-0 flex-1">{children}</main>
           </div>
+          <CommandPalette />
           <Toaster />
         </ThemeProvider>
       </body>

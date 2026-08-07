@@ -27,6 +27,8 @@ Bring your own Anthropic API key for real model calls — or run entirely offlin
 - **Groups & escalation hierarchy** — assignment groups (Development, Analytics, Engineering…) own ticket categories; members carry JUNIOR → MID → SENIOR tiers per group, or STANDALONE for specialists outside the ladder. Priority sets the minimum tier, and any agent can escalate a ticket up a tier or across to another group — the least-loaded eligible member picks it up and the move is logged on the timeline.
 - **Real Azure integration (read-only)** — a service principal with `Reader` is enough: `azure_list_resources` runs live Resource Manager queries (subscription-wide or scoped to a resource group), with a Test-connection button that acquires a token and lists resources. Mutating cloud actions stay simulated behind the approval gate.
 - **Real GitHub integration** — add a personal access token (env `GITHUB_TOKEN` or Settings, with a Test-token button) and `github_create_repo` / `github_open_pr` hit the real GitHub API — still behind their risk levels and approval gates. Without a token they stay simulated so the offline demo keeps working. A base-URL override supports GitHub Enterprise.
+- **Outbound webhooks** — stream `ticket.created/resolved/escalated` and `approval.pending/decided` to any endpoint as signed JSON (`x-servo-signature: sha256=HMAC(secret, body)`). Manage endpoints and subscriptions from Settings, send test pings, and watch a per-endpoint delivery log with latencies.
+- **Command palette (Ctrl/⌘ K)** — search tickets by number, title, or text and jump to any page from the keyboard, anywhere in the app.
 - **Email in and out** — outbound: ticket received / resolved to the requester and pending approvals to every admin, over any SMTP server (`SMTP_URL` or Settings, with a test-send button); sending is best-effort so a broken mail setup never blocks ticket flows. Inbound: point a provider webhook (SendGrid Inbound Parse, Mailgun, Postmark, or an IMAP relay) at `POST /api/inbound/email` and mail becomes tickets — unknown senders are created as requesters, and a subject carrying `#1029` files the message as a comment on that ticket instead.
 - **Custom tools & integrations** — admins define new HTTP tools from Settings (method, URL, headers, body template with `{input.field}` placeholders, and a stored secret injected via `{secret}`). They join the resolver's registry like built-in tools, with the same risk levels and human-approval gates — the fastest path to integrating a webhook, an internal API, or a SaaS endpoint.
 - **Specialized agents as `.md` files** — resolver personas (Analytics, Developer, Cybersecurity…) are Markdown documents with YAML frontmatter (`name`, `categories`, `tools`) and a system-prompt body. Drop files into `agents/` or create/edit them from the UI; the resolver automatically uses the enabled specialist covering the ticket's category, with its tool set narrowed to the profile's allowlist.
@@ -61,6 +63,8 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000). The database is SQLite — no external services needed.
+
+Run the unit tests with `npm test` (vitest — pure rules: SLA clocks, escalation tiers, webhook signing).
 
 ### Run with Docker
 
@@ -150,7 +154,6 @@ docs/
 - Real AWS and GCP integrations, and Azure write operations (GitHub and read-only Azure already work with credentials)
 - OpenAI-compatible providers alongside Anthropic (Anthropic-compatible endpoints like Z.AI already work via the Base URL setting)
 - SSO and real RBAC (the current roles/permissions are a demo matrix)
-- Webhooks and an events API
 - Email/Slack notifications
 
 ## Security disclaimer
