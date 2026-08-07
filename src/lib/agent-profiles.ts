@@ -8,6 +8,7 @@ export {
   CORE_TOOLS,
   parseProfileMarkdown,
   profileAllowsTool,
+  setProfileTools,
   slugify,
   type ParsedProfile,
 } from "@/lib/agent-profile-format";

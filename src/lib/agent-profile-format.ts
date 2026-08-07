@@ -75,6 +75,18 @@ export function parseProfileMarkdown(
   return { name, description, categories, tools, systemPrompt };
 }
 
+/**
+ * Rewrite a profile's `tools:` frontmatter while preserving everything else
+ * (name, description, categories, and the system-prompt body). Lets the UI
+ * offer a checkbox tool picker without hand-editing YAML — the .md stays the
+ * source of truth.
+ */
+export function setProfileTools(markdown: string, tools: string[]): string {
+  const { data, content } = matter(markdown);
+  data.tools = tools;
+  return matter.stringify(content, data);
+}
+
 /** Whether a run under this profile may use the tool (core tools always pass). */
 export function profileAllowsTool(
   profile: { tools: string } | null,

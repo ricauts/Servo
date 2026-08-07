@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bot, Pencil, Plus, Trash2 } from "lucide-react";
+import { Bot, Pencil, Plus, SlidersHorizontal, Trash2 } from "lucide-react";
 import {
   Card,
   CardAction,
@@ -23,9 +23,11 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import Badge from "@/components/legacy/Badge";
+import Spinner from "@/components/legacy/Spinner";
 import EmptyState from "@/components/legacy/EmptyState";
-import { CATEGORY_LABEL } from "@/lib/labels";
-import type { Category } from "@/lib/types";
+import { CATEGORY_LABEL, RISK_LABEL, RISK_TONE } from "@/lib/labels";
+import type { Category, RiskLevel } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 export interface AgentProfileView {
   id: string;
@@ -37,6 +39,15 @@ export interface AgentProfileView {
   markdown: string;
   enabled: boolean;
   runCount: number;
+}
+
+export interface ToolCatalogItem {
+  name: string;
+  description: string;
+  riskLevel: RiskLevel;
+  requiresApproval: boolean;
+  /** Core tools are always granted and cannot be toggled off. */
+  core: boolean;
 }
 
 const NEW_AGENT_TEMPLATE = `---
@@ -138,17 +149,145 @@ function EditorDialog({
   );
 }
 
+/** Checkbox picker for a profile's tool allowlist. Empty selection = every
+ * enabled tool (the profile default); core tools are always on and locked. */
+function ToolPickerDialog({
+  open,
+  onOpenChange,
+  catalog,
+  selected,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  catalog: ToolCatalogItem[];
+  selected: string[];
+  onSave: (tools: string[]) => Promise<string | null>;
+}) {
+  // Start from the profile's current allowlist; if it's empty the profile
+  // grants everything, so pre-check every non-core tool to make that explicit.
+  const optional = catalog.filter((t) => !t.core);
+  const allOptional = optional.map((t) => t.name);
+  const [picked, setPicked] = useState<Set<string>>(
+    () => new Set(selected.length > 0 ? selected : allOptional),
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Re-seed when the dialog reopens with a different profile.
+  const [lastSelected, setLastSelected] = useState(selected.join(","));
+  const key = selected.join(",");
+  if (key !== lastSelected) {
+    setLastSelected(key);
+    setPicked(new Set(selected.length > 0 ? selected : allOptional));
+  }
+
+  function toggle(name: string) {
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    // All optional tools checked → store [] (means "all enabled tools").
+    const chosen = allOptional.filter((n) => picked.has(n));
+    const tools = chosen.length === allOptional.length ? [] : chosen;
+    const err = await onSave(tools);
+    setBusy(false);
+    if (err) setError(err);
+    else onOpenChange(false);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Tools & permissions</DialogTitle>
+          <DialogDescription>
+            Choose which tools this agent may call. Risk level and approval
+            gates come from the global tool policy and apply on top.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="max-h-[55vh] space-y-1.5 overflow-y-auto">
+          {catalog.map((tool) => {
+            const checked = tool.core || picked.has(tool.name);
+            return (
+              <label
+                key={tool.name}
+                className={cn(
+                  "flex cursor-pointer items-start gap-3 rounded-md border border-border px-3 py-2 transition-colors",
+                  checked ? "bg-accent/40" : "hover:bg-muted/50",
+                  tool.core && "cursor-default opacity-90",
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={tool.core || busy}
+                  onChange={() => toggle(tool.name)}
+                  className="mt-1 h-4 w-4 accent-[var(--primary)]"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <span className="font-mono text-[12.5px] font-medium">
+                      {tool.name}
+                    </span>
+                    <Badge tone={RISK_TONE[tool.riskLevel]}>
+                      {RISK_LABEL[tool.riskLevel]}
+                    </Badge>
+                    {tool.requiresApproval && <Badge tone="warn">Approval</Badge>}
+                    {tool.core && <Badge tone="neutral">Always on</Badge>}
+                  </span>
+                  <span className="mt-0.5 block text-[12px] text-muted-foreground">
+                    {tool.description}
+                  </span>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+
+        {error && <p className="text-[13px] text-critical">{error}</p>}
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+            disabled={busy}
+          >
+            Cancel
+          </Button>
+          <Button type="button" onClick={() => void save()} disabled={busy}>
+            {busy && <Spinner size={14} className="text-primary-foreground" />}
+            Save tools
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function AgentCard({
   profile,
+  catalog,
   canManage,
 }: {
   profile: AgentProfileView;
+  catalog: ToolCatalogItem[];
   canManage: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const [pickingTools, setPickingTools] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   async function toggleEnabled(enabled: boolean) {
@@ -203,7 +342,7 @@ function AgentCard({
           </span>
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           {(profile.tools.length > 0 ? profile.tools : ["all enabled tools"]).map(
             (t) => (
               <span
@@ -217,7 +356,16 @@ function AgentCard({
         </div>
 
         {canManage && (
-          <div className="flex items-center gap-2 border-t border-border pt-3">
+          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPickingTools(true)}
+            >
+              <SlidersHorizontal size={13} />
+              Tools
+            </Button>
             <Button
               type="button"
               variant="outline"
@@ -277,15 +425,29 @@ function AgentCard({
           return res.ok ? null : (res.error ?? "Save failed.");
         }}
       />
+
+      <ToolPickerDialog
+        open={pickingTools}
+        onOpenChange={setPickingTools}
+        catalog={catalog}
+        selected={profile.tools}
+        onSave={async (tools) => {
+          const res = await api(`/api/agents/${profile.id}`, "PATCH", { tools });
+          if (res.ok) router.refresh();
+          return res.ok ? null : (res.error ?? "Save failed.");
+        }}
+      />
     </Card>
   );
 }
 
 export default function AgentsManager({
   profiles,
+  toolCatalog,
   canManage,
 }: {
   profiles: AgentProfileView[];
+  toolCatalog: ToolCatalogItem[];
   canManage: boolean;
 }) {
   const router = useRouter();
@@ -315,7 +477,12 @@ export default function AgentsManager({
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {profiles.map((p) => (
-            <AgentCard key={p.id} profile={p} canManage={canManage} />
+            <AgentCard
+              key={p.id}
+              profile={p}
+              catalog={toolCatalog}
+              canManage={canManage}
+            />
           ))}
         </div>
       )}

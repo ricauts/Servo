@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { forbid } from "@/lib/permissions";
-import { parseProfileMarkdown, slugify } from "@/lib/agent-profiles";
+import { parseProfileMarkdown, setProfileTools, slugify } from "@/lib/agent-profiles";
 import { getToolRegistry } from "@/lib/ai/custom-tools";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +13,9 @@ type Params = { params: Promise<{ id: string }> };
 const patchSchema = z.object({
   markdown: z.string().min(1).optional(),
   enabled: z.boolean().optional(),
+  // Visual tool picker: replaces the profile's allowlist without hand-editing
+  // the YAML. Empty array = every enabled tool (the profile's default).
+  tools: z.array(z.string()).optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: Params) {
@@ -69,6 +72,21 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     };
   }
   if (parsed.data.enabled !== undefined) data.enabled = parsed.data.enabled;
+
+  // Visual tool picker: rewrite the allowlist (and the .md frontmatter that
+  // mirrors it) when the caller didn't already send a full markdown replace.
+  if (parsed.data.tools !== undefined && parsed.data.markdown === undefined) {
+    const known = Object.keys(await getToolRegistry());
+    const unknown = parsed.data.tools.filter((t) => !known.includes(t));
+    if (unknown.length > 0) {
+      return Response.json(
+        { error: `Unknown tool(s): ${unknown.join(", ")}.` },
+        { status: 400 },
+      );
+    }
+    data.tools = JSON.stringify(parsed.data.tools);
+    data.markdown = setProfileTools(existing.markdown, parsed.data.tools);
+  }
 
   const updated = await db.agentProfile.update({ where: { id }, data });
   return Response.json({ profile: updated });
