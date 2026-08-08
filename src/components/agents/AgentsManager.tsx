@@ -20,6 +20,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import Badge from "@/components/legacy/Badge";
@@ -38,6 +46,7 @@ export interface AgentProfileView {
   tools: string[];
   markdown: string;
   enabled: boolean;
+  credentialId: string | null;
   runCount: number;
 }
 
@@ -49,6 +58,14 @@ export interface ToolCatalogItem {
   /** Core tools are always granted and cannot be toggled off. */
   core: boolean;
 }
+
+export interface CredentialOption {
+  id: string;
+  name: string;
+}
+
+/** Radix Select items cannot carry an empty value — sentinel for "default". */
+const DEFAULT_CREDENTIAL = "DEFAULT";
 
 const NEW_AGENT_TEMPLATE = `---
 name: My Specialist Agent
@@ -277,10 +294,12 @@ function ToolPickerDialog({
 function AgentCard({
   profile,
   catalog,
+  credentials,
   canManage,
 }: {
   profile: AgentProfileView;
   catalog: ToolCatalogItem[];
+  credentials: CredentialOption[];
   canManage: boolean;
 }) {
   const router = useRouter();
@@ -354,6 +373,42 @@ function AgentCard({
             ),
           )}
         </div>
+
+        {canManage && credentials.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="font-heading text-xs text-muted-foreground">
+              API key
+            </span>
+            <Select
+              value={profile.credentialId ?? DEFAULT_CREDENTIAL}
+              disabled={busy}
+              onValueChange={(value) => {
+                void (async () => {
+                  setBusy(true);
+                  const res = await api(`/api/agents/${profile.id}`, "PATCH", {
+                    credentialId: value === DEFAULT_CREDENTIAL ? null : value,
+                  });
+                  if (!res.ok) setError(res.error ?? null);
+                  else router.refresh();
+                  setBusy(false);
+                })();
+              }}
+            >
+              <SelectTrigger size="sm" className="min-w-0 flex-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={DEFAULT_CREDENTIAL}>Default provider</SelectItem>
+                <SelectSeparator />
+                {credentials.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {canManage && (
           <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
@@ -444,10 +499,12 @@ function AgentCard({
 export default function AgentsManager({
   profiles,
   toolCatalog,
+  credentials,
   canManage,
 }: {
   profiles: AgentProfileView[];
   toolCatalog: ToolCatalogItem[];
+  credentials: CredentialOption[];
   canManage: boolean;
 }) {
   const router = useRouter();
@@ -481,6 +538,7 @@ export default function AgentsManager({
               key={p.id}
               profile={p}
               catalog={toolCatalog}
+              credentials={credentials}
               canManage={canManage}
             />
           ))}

@@ -37,6 +37,8 @@ async function main() {
   await db.agentStep.deleteMany();
   await db.agentRun.deleteMany();
   await db.agentProfile.deleteMany();
+  await db.aiCredential.deleteMany();
+  await db.aiUsage.deleteMany();
   await db.customTool.deleteMany();
   await db.comment.deleteMany();
   await db.ticket.deleteMany();

@@ -21,6 +21,7 @@ import {
   pickGroupAssignee,
 } from "@/lib/escalation";
 import { pickAgentProfile, profileAllowsTool } from "@/lib/agent-profiles";
+import { settingsForProfile, withUsage } from "./credentials";
 import { notifyApprovalPending } from "@/lib/notify";
 import { emitEvent } from "@/lib/webhooks";
 import { applySlaToTicket } from "@/lib/sla";
@@ -39,6 +40,8 @@ interface LoopContext {
   ticket: TicketWithRequester;
   agentUser: User;
   settings: AiSettings;
+  /** Pool credential the run bills to ("default"/"mock" otherwise). */
+  credentialName: string;
   provider: ChatProvider;
   system: string;
   toolSpecs: ToolSpec[];
@@ -176,7 +179,6 @@ async function buildLoopContext(
   messages: ConversationMessage[],
   nextIndex: number,
 ): Promise<LoopContext> {
-  const settings = await getAiSettings();
   // Built-in tools added by an upgrade need their policy row before the
   // enabled-policy query below can surface them.
   await ensureToolPolicies();
@@ -184,12 +186,14 @@ async function buildLoopContext(
   // Built-in tools plus admin-defined custom integrations.
   const registry = await getToolRegistry();
   // A specialized profile (pinned on the run at creation so resumes keep the
-  // same persona) narrows the tool set and extends the system prompt.
+  // same persona) narrows the tool set, extends the system prompt, and may
+  // carry its own pool credential.
   const runRow = await db.agentRun.findUnique({
     where: { id: runId },
-    include: { profile: true },
+    include: { profile: { include: { credential: true } } },
   });
   const profile = runRow?.profile ?? null;
+  const { settings, credentialName } = await settingsForProfile(profile);
   const activePolicies = enabledPolicies.filter((policy) =>
     profileAllowsTool(profile, policy.toolName),
   );
@@ -201,7 +205,14 @@ async function buildLoopContext(
     ticket,
     agentUser,
     settings,
-    provider: getProvider(settings, { ticket, kind: "RESOLVE" }),
+    credentialName: settings.provider === "mock" ? "mock" : credentialName,
+    provider: withUsage(getProvider(settings, { ticket, kind: "RESOLVE" }), {
+      kind: "RESOLVE",
+      agentName: profile?.name ?? "Servo Resolver",
+      credentialName: settings.provider === "mock" ? "mock" : credentialName,
+      provider: settings.provider,
+      model: settings.model,
+    }),
     system,
     toolSpecs: toolSpecsFor(activePolicies, registry),
     policies: new Map(activePolicies.map((policy) => [policy.toolName, policy])),
@@ -217,7 +228,13 @@ export async function runTriage(ticketId: string): Promise<AgentRun> {
   const ticket = await loadTicket(ticketId);
   const triageAgent = await getAiUser("TRIAGE");
   const settings = await getAiSettings();
-  const provider = getProvider(settings, { ticket, kind: "TRIAGE" });
+  const provider = withUsage(getProvider(settings, { ticket, kind: "TRIAGE" }), {
+    kind: "TRIAGE",
+    agentName: "Servo Triage",
+    credentialName: settings.provider === "mock" ? "mock" : "default",
+    provider: settings.provider,
+    model: settings.model,
+  });
 
   const messages: ConversationMessage[] = [
     { role: "user", content: [{ type: "text", text: triageUser(ticket) }] },
@@ -639,7 +656,16 @@ async function runQaReview(ctx: LoopContext): Promise<void> {
       where: { id: ctx.runId },
       include: { steps: { orderBy: { index: "asc" } } },
     });
-    const qaProvider = getProvider(ctx.settings, { ticket: ctx.ticket, kind: "QA" });
+    const qaProvider = withUsage(
+      getProvider(ctx.settings, { ticket: ctx.ticket, kind: "QA" }),
+      {
+        kind: "QA",
+        agentName: "Servo QA",
+        credentialName: ctx.credentialName,
+        provider: ctx.settings.provider,
+        model: ctx.settings.model,
+      },
+    );
     const turn = await qaProvider.complete({
       system: qaSystem,
       messages: [

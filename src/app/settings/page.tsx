@@ -32,6 +32,9 @@ import CustomToolsManager, {
 } from "@/components/admin/CustomToolsManager";
 import { ensureSlaPolicies } from "@/lib/sla";
 import RoleSelect from "@/components/admin/RoleSelect";
+import CredentialsManager, {
+  type CredentialView,
+} from "@/components/admin/CredentialsManager";
 import SlaPolicyTable, {
   type SlaPolicyView,
 } from "@/components/admin/SlaPolicyTable";
@@ -76,6 +79,19 @@ export default async function SettingsPage() {
       db.user.findMany({ orderBy: { createdAt: "asc" } }),
       db.slaPolicy.findMany(),
     ]);
+
+  const credentialRows = await db.aiCredential.findMany({
+    orderBy: { createdAt: "asc" },
+    include: { _count: { select: { profiles: true } } },
+  });
+  const credentialViews: CredentialView[] = credentialRows.map((c) => ({
+    id: c.id,
+    name: c.name,
+    provider: c.provider,
+    model: c.model,
+    baseUrl: c.baseUrl,
+    inUse: c._count.profiles,
+  }));
 
   const slaByPriority = new Map(slaPolicies.map((p) => [p.priority, p]));
   const slaViews: SlaPolicyView[] = PRIORITIES.flatMap((priority) => {
@@ -144,13 +160,22 @@ export default async function SettingsPage() {
           <TabsTrigger value="team">Team</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="ai">
+        <TabsContent value="ai" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>AI provider (BYOK)</CardTitle>
             </CardHeader>
             <CardContent>
               <AiProviderForm initial={aiSettings} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>API key pool</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CredentialsManager credentials={credentialViews} />
             </CardContent>
           </Card>
         </TabsContent>

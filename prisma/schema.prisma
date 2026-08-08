@@ -153,10 +153,43 @@ model AgentProfile {
   systemPrompt String // markdown body appended to the resolver system prompt
   markdown     String // raw .md source (frontmatter + body)
   enabled      Boolean  @default(true)
+  // Which pool credential this agent runs on; null = the default BYOK config.
+  credentialId String?
+  credential   AiCredential? @relation(fields: [credentialId], references: [id])
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   runs AgentRun[]
+}
+
+// A named BYOK credential in the pool, assignable to specialized agents.
+// The key itself is never returned by the API.
+model AiCredential {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  provider  String // anthropic | zai | openai
+  apiKey    String
+  baseUrl   String   @default("")
+  model     String   @default("")
+  createdAt DateTime @default(now())
+
+  profiles AgentProfile[]
+}
+
+// One row per model call — the raw material for per-key/per-agent throughput.
+model AiUsage {
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now())
+  credentialName String // pool credential name, "default", or "mock"
+  provider       String
+  model          String
+  kind           String // TRIAGE | RESOLVE | QA
+  agentName      String // system agent or specialized profile name
+  inputTokens    Int      @default(0)
+  outputTokens   Int      @default(0)
+  latencyMs      Int
+  ok             Boolean  @default(true)
+  error          String?
 }
 
 model ToolPolicy {

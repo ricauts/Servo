@@ -16,6 +16,8 @@ const patchSchema = z.object({
   // Visual tool picker: replaces the profile's allowlist without hand-editing
   // the YAML. Empty array = every enabled tool (the profile's default).
   tools: z.array(z.string()).optional(),
+  // Pool credential this agent runs on; null reverts to the default config.
+  credentialId: z.string().nullable().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: Params) {
@@ -86,6 +88,18 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
     data.tools = JSON.stringify(parsed.data.tools);
     data.markdown = setProfileTools(existing.markdown, parsed.data.tools);
+  }
+
+  if (parsed.data.credentialId !== undefined) {
+    if (parsed.data.credentialId !== null) {
+      const credential = await db.aiCredential.findUnique({
+        where: { id: parsed.data.credentialId },
+      });
+      if (!credential) {
+        return Response.json({ error: "Credential not found." }, { status: 400 });
+      }
+    }
+    data.credentialId = parsed.data.credentialId;
   }
 
   const updated = await db.agentProfile.update({ where: { id }, data });

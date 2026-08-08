@@ -22,6 +22,8 @@ export interface ToolSpec {
 export interface AssistantTurn {
   text: string;
   toolCalls: { id: string; name: string; input: Record<string, unknown> }[];
+  /** Token accounting when the provider reports it (real providers do). */
+  usage?: { inputTokens: number; outputTokens: number };
 }
 
 export interface ChatProvider {
@@ -78,7 +80,14 @@ class AnthropicProvider implements ChatProvider {
         });
       }
     }
-    return { text, toolCalls };
+    return {
+      text,
+      toolCalls,
+      usage: {
+        inputTokens: response.usage?.input_tokens ?? 0,
+        outputTokens: response.usage?.output_tokens ?? 0,
+      },
+    };
   }
 }
 
@@ -203,6 +212,7 @@ class OpenAiCompatibleProvider implements ChatProvider {
           }[];
         };
       }[];
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
     const message = data.choices?.[0]?.message;
     if (!message) throw new Error("OpenAI-compatible endpoint returned no choices.");
@@ -218,7 +228,14 @@ class OpenAiCompatibleProvider implements ChatProvider {
       }
       toolCalls.push({ id: call.id ?? `call_${i}`, name: call.function.name, input });
     }
-    return { text: message.content ?? "", toolCalls };
+    return {
+      text: message.content ?? "",
+      toolCalls,
+      usage: {
+        inputTokens: data.usage?.prompt_tokens ?? 0,
+        outputTokens: data.usage?.completion_tokens ?? 0,
+      },
+    };
   }
 }
 
