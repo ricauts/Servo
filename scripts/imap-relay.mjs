@@ -77,6 +77,12 @@ async function run() {
     auth: { user: config.user, pass: config.password },
     logger: false,
   });
+  // Socket drops (Gmail resets idle connections) surface as async 'error'
+  // events; without a listener they become fatal unhandled rejections.
+  // With one, the next command throws normally and the outer loop reconnects.
+  client.on("error", (err) => {
+    console.error(`[relay] socket error: ${err.message}`);
+  });
   await client.connect();
   console.log(`[relay] connected to ${config.host} as ${config.user}; polling every ${config.pollSeconds}s`);
   const lock = await client.getMailboxLock("INBOX");
@@ -89,7 +95,11 @@ async function run() {
       await new Promise((r) => setTimeout(r, config.pollSeconds * 1000));
     }
   } finally {
-    lock.release();
+    try {
+      lock.release();
+    } catch {
+      /* connection already gone */
+    }
   }
 }
 
