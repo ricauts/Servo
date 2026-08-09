@@ -103,8 +103,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
               color: USER_COLORS[count % USER_COLORS.length],
             },
           });
-        } else if (shouldBeAdmin && existing.role !== "ADMIN") {
-          await db.user.update({ where: { email }, data: { role: "ADMIN" } });
+        } else {
+          // The IdP owns identity: refresh the display name (e.g. a row first
+          // provisioned from inbound email carries a stale name) and keep
+          // configured admins in the ADMIN role.
+          const idpName = (profile?.name as string | undefined) ?? undefined;
+          const data: { role?: string; name?: string } = {};
+          if (shouldBeAdmin && existing.role !== "ADMIN") data.role = "ADMIN";
+          if (idpName && idpName !== existing.name) data.name = idpName;
+          if (Object.keys(data).length > 0) {
+            await db.user.update({ where: { email }, data });
+          }
         }
         return true;
       },
