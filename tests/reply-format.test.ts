@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { replySubject } from "@/lib/reply-format";
+import { isEditedReply, replySubject } from "@/lib/reply-format";
 import { extractTicketNumber, stripQuotedReply } from "@/lib/inbound-email";
 
 describe("replySubject", () => {
@@ -18,6 +18,17 @@ describe("replySubject", () => {
 
   it("collapses whitespace from mail-mangled titles", () => {
     expect(replySubject(7, "hello\n  world")).toBe("Re: [Servo] #7 hello world");
+  });
+});
+
+describe("isEditedReply", () => {
+  it("treats line endings and edge whitespace as UI noise, not edits", () => {
+    expect(isEditedReply("Hi,\nall good.\n", "Hi,\r\nall good.")).toBe(false);
+    expect(isEditedReply("Hi", "  Hi  ")).toBe(false);
+  });
+
+  it("flags real text changes", () => {
+    expect(isEditedReply("We reset your password.", "We reset your password now.")).toBe(true);
   });
 });
 

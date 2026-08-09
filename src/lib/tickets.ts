@@ -68,7 +68,7 @@ export async function getKpis(): Promise<KpiResponse> {
   // Last 30 calendar days inclusive of today, from local midnight.
   const since = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
 
-  const [openTickets, resolved30, created30, allApprovals] = await Promise.all([
+  const [openTickets, resolved30, created30, allApprovals, drafts30] = await Promise.all([
     db.ticket.findMany({
       where: { status: { notIn: ["RESOLVED", "CLOSED"] } },
       select: {
@@ -99,6 +99,11 @@ export async function getKpis(): Promise<KpiResponse> {
       },
     }),
     db.approval.findMany({ select: { status: true } }),
+    // Pending drafts (whenever created) + decisions of the last 30 days.
+    db.replyDraft.findMany({
+      where: { OR: [{ status: "PENDING" }, { decidedAt: { gte: since } }] },
+      select: { status: true, edited: true },
+    }),
   ]);
 
   // --- totals -------------------------------------------------------------
@@ -138,6 +143,13 @@ export async function getKpis(): Promise<KpiResponse> {
     if (a.status === "APPROVED") approvalStats.approved++;
     else if (a.status === "REJECTED") approvalStats.rejected++;
     else if (a.status === "PENDING") approvalStats.pending++;
+  }
+
+  const draftStats = { pending: 0, sentAsIs: 0, edited: 0, discarded: 0 };
+  for (const d of drafts30) {
+    if (d.status === "PENDING") draftStats.pending++;
+    else if (d.status === "SENT") d.edited ? draftStats.edited++ : draftStats.sentAsIs++;
+    else if (d.status === "REJECTED") draftStats.discarded++;
   }
 
   // --- createdByDay (zero-filled, local calendar days) --------------------
@@ -203,6 +215,7 @@ export async function getKpis(): Promise<KpiResponse> {
       { resolver: "HUMAN", count: resolved30.length - aiResolved },
     ],
     approvalStats,
+    draftStats,
     topRequesters,
   };
 }

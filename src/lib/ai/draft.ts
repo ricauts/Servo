@@ -12,7 +12,7 @@
 import type { ReplyDraft, User } from "@prisma/client";
 import { db } from "@/lib/db";
 import { sendMail } from "@/lib/notify";
-import { replySubject } from "@/lib/reply-format";
+import { isEditedReply, replySubject } from "@/lib/reply-format";
 import { emitEvent } from "@/lib/webhooks";
 import { pickAgentProfile } from "@/lib/agent-profiles";
 import { settingsForProfile, withUsage } from "./credentials";
@@ -121,12 +121,14 @@ export async function approveDraft(
   }
 
   const body = (finalBody ?? "").trim() || draft.body;
+  // Feeds the dashboard's AI acceptance metric: sent as-is vs edited first.
+  const edited = isEditedReply(draft.body, body);
 
   // Atomic claim: only one concurrent decision wins; the rest see 0 rows and
   // never send anything. The row records the body that actually went out.
   const { count } = await db.replyDraft.updateMany({
     where: { id: draftId, status: "PENDING" },
-    data: { status: "SENT", body, decidedAt: new Date(), deciderId: decider.id },
+    data: { status: "SENT", body, edited, decidedAt: new Date(), deciderId: decider.id },
   });
   if (count === 0) throw new Error("Draft was already decided.");
 

@@ -13,6 +13,7 @@ import CategoryBars from "@/components/dashboard/CategoryBars";
 import PriorityBars from "@/components/dashboard/PriorityBars";
 import AiVsHumanBar from "@/components/dashboard/AiVsHumanBar";
 import ApprovalsTile from "@/components/dashboard/ApprovalsTile";
+import DraftRepliesTile from "@/components/dashboard/DraftRepliesTile";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,7 @@ export default async function DashboardPage() {
   }
 
   const kpis: KpiResponse = await getKpis();
-  const { totals, approvalStats } = kpis;
+  const { totals, approvalStats, draftStats } = kpis;
 
   const aiResolved = kpis.aiVsHuman.find((r) => r.resolver === "AI")?.count ?? 0;
   const humanResolved =
@@ -107,19 +108,30 @@ export default async function DashboardPage() {
         </Card>
 
         {/* By priority */}
-        <Card className="col-span-12 gap-3 px-5 py-4 md:col-span-4 xl:min-h-0">
+        <Card className="col-span-12 gap-3 px-5 py-4 md:col-span-6 xl:col-span-3 xl:min-h-0">
           <CardHeading>By priority</CardHeading>
           <PriorityBars data={kpis.byPriority} />
         </Card>
 
         {/* AI vs human resolutions */}
-        <Card className="col-span-12 gap-3 px-5 py-4 md:col-span-5 xl:min-h-0">
+        <Card className="col-span-12 gap-3 px-5 py-4 md:col-span-6 xl:col-span-4 xl:min-h-0">
           <CardHeading>AI vs human resolutions — 30d</CardHeading>
           <AiVsHumanBar ai={aiResolved} human={humanResolved} />
         </Card>
 
+        {/* AI reply drafts mini-tile */}
+        <Card className="col-span-12 gap-2 px-5 py-4 md:col-span-6 xl:col-span-3 xl:min-h-0">
+          <CardHeading>AI replies — 30d</CardHeading>
+          <DraftRepliesTile
+            pending={draftStats.pending}
+            sentAsIs={draftStats.sentAsIs}
+            edited={draftStats.edited}
+            discarded={draftStats.discarded}
+          />
+        </Card>
+
         {/* Approvals mini-tile */}
-        <Card className="col-span-12 gap-2 px-5 py-4 md:col-span-3 xl:min-h-0">
+        <Card className="col-span-12 gap-2 px-5 py-4 md:col-span-6 xl:col-span-2 xl:min-h-0">
           <CardHeading>Approvals</CardHeading>
           <ApprovalsTile
             approved={approvalStats.approved}

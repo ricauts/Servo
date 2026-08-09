@@ -122,5 +122,8 @@ export interface KpiResponse {
   byPriority: { priority: Priority; count: number }[];
   aiVsHuman: { resolver: "AI" | "HUMAN"; count: number }[]; // resolved last 30d
   approvalStats: { approved: number; rejected: number; pending: number };
+  // AI reply drafts, last 30 days by decision date (pending = right now).
+  // sentAsIs vs edited is the AI acceptance signal for drafted replies.
+  draftStats: { pending: number; sentAsIs: number; edited: number; discarded: number };
   topRequesters: { name: string; count: number }[]; // last 30d, top 5
 }

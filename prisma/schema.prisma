@@ -91,6 +91,7 @@ model ReplyDraft {
   status    String    @default("PENDING") // PENDING | SENT | REJECTED
   agentName String    @default("Servo Drafter") // persona that wrote the draft
   emailed   Boolean   @default(false) // approved reply actually left via SMTP
+  edited    Boolean   @default(false) // human changed the AI text before sending
   createdAt DateTime  @default(now())
   decidedAt DateTime?
   deciderId String?
