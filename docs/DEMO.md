@@ -1,8 +1,9 @@
 # Servo — 5-minute demo script
 
-A guided tour using the seeded data. Prerequisites: `npm install`,
-`npm run setup`, `npm run dev`, then open http://localhost:3000. Everything
-below works offline in the default **mock** provider mode — no API key needed.
+A guided tour using the showcase dataset. Prerequisites: `npm install`,
+`npm run demo` (loads the fictional demo data — wipes the database),
+`npm run dev`, then open http://localhost:3000. Everything below works
+offline in the default **mock** provider mode — no API key needed.
 
 Use the **user switcher** in the sidebar to change who you are at each step.
 

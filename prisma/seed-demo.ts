@@ -1,4 +1,9 @@
 /* eslint-disable no-console */
+// OPTIONAL showcase dataset (`npm run demo`): fictional users, ~2 dozen
+// tickets, runs, approvals and a populated ops sandbox so the dashboard is
+// meaningful instantly. WIPES the database first — never run it on a live
+// install. Fresh production installs use seed-core.ts + the /setup wizard.
+//
 // Seeds Servo's demo data: users, settings, tool policies, a sandbox "ops"
 // database the AI agents operate on, and ~2 dozen tickets spread over the last
 // 30 days (including AI-resolved runs and two pending approvals) so the KPI

@@ -63,11 +63,13 @@ Requires **Node.js 20+**.
 
 ```bash
 npm install
-npm run setup   # prisma generate + db push + seed demo data
+npm run setup   # prisma generate + db push + core bootstrap (no sample data)
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The database is SQLite — no external services needed.
+Open [http://localhost:3000](http://localhost:3000) — the **first-run wizard** creates your admin account (and, optionally, connects your SSO tenant). You start with a clean desk: zero tickets, no sample users, nobody else's data. The database is SQLite — no external services needed.
+
+Want a populated playground instead? `npm run demo` loads a fictional showcase dataset (~28 tickets, completed AI runs, pending approvals) so every screen is meaningful instantly. It **wipes the database** — demo evaluation only, never a live install.
 
 Run the unit tests with `npm test`, the RBAC matrix with `node scripts/permissions-audit.mjs`, and the responsive check with `node scripts/responsive-audit.mjs` (both need the dev server running).
 
@@ -77,9 +79,17 @@ Run the unit tests with `npm test`, the RBAC matrix with `node scripts/permissio
 docker compose up --build
 ```
 
-The container creates and seeds its SQLite databases on a named volume (`/data`) on first boot, then serves on [http://localhost:3000](http://localhost:3000). Set `ANTHROPIC_API_KEY` in `docker-compose.yml` to enable real model calls; without it Servo runs in mock mode.
+The container bootstraps its SQLite databases on a named volume (`/data`) on first boot, then serves on [http://localhost:3000](http://localhost:3000) — visit it to run the setup wizard. Set `SERVO_DEMO=1` for the showcase dataset instead, and `ANTHROPIC_API_KEY` (or configure a key in Settings) for real model calls; without one Servo runs in mock mode.
 
-`npm run setup` seeds ~28 tickets across the last 30 days, completed AI runs with full step traces, and two runs currently paused waiting for approval, so the dashboard and approvals inbox are meaningful from the first render. Run `npm run seed` any time to reset the demo data.
+### Production checklist
+
+Before exposing an install to real users, set these (see [SECURITY.md](SECURITY.md) for the full model):
+
+- `AUTH_SECRET` — session signing (any long random string).
+- `SERVO_ENCRYPTION_KEY` — encrypts stored secrets (API keys, tokens, SMTP URLs) at rest with AES-256-GCM. Existing plaintext rows migrate with `node scripts/encrypt-secrets.cjs`.
+- An OIDC tenant (wizard or Integrations → SSO) plus `AUTH_ALLOWED_DOMAINS` — real sign-in, scoped to your org.
+- HTTPS in front (reverse proxy) and `APP_URL` set to your public URL.
+- Scoped credentials for integrations: a fine-grained GitHub PAT, a Reader-role Azure service principal, an app password for the mailbox.
 
 ## Authentication (SSO / OIDC)
 
@@ -113,7 +123,7 @@ Notes:
 - If the selected provider has no usable credentials, Servo falls back to mock mode (Settings shows a warning) so the app never breaks.
 - The agent loop, approval gates, and QA are provider-agnostic: tool use is translated to Anthropic `tool_use` blocks or OpenAI function `tool_calls` automatically.
 
-> **POC caveat:** a key saved through Settings is stored **in plain text in the local SQLite database**. Fine for a local demo; do not do this with a production key on a shared machine. Prefer the environment variable.
+> **Secrets at rest:** with `SERVO_ENCRYPTION_KEY` set, every key saved through Settings (and pool credentials, custom-tool secrets, webhook secrets) is encrypted with AES-256-GCM before it touches SQLite. Without the key Servo still works but stores them in plain text — fine for a local demo, not for production. See [SECURITY.md](SECURITY.md).
 
 ## Demo users
 

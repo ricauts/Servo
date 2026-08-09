@@ -6,6 +6,7 @@
 
 import type { CustomTool } from "@prisma/client";
 import { db } from "@/lib/db";
+import { open } from "@/lib/secret-store";
 import { DEFAULT_TOOL_POLICIES } from "./tool-policies";
 import { TOOLS, type ToolDef } from "./tools";
 
@@ -47,12 +48,14 @@ export function customToolToDef(tool: CustomTool): ToolDef {
     description: tool.description,
     inputSchema,
     async execute(input) {
-      const url = fill(tool.url, input, tool.secret, { urlEncode: true });
+      // Stored encrypted at rest; opened only here, at substitution time.
+      const secret = open(tool.secret);
+      const url = fill(tool.url, input, secret, { urlEncode: true });
       let headers: Record<string, string> = {};
       try {
         const parsed = JSON.parse(tool.headers) as Record<string, string>;
         for (const [k, v] of Object.entries(parsed)) {
-          headers[k] = fill(String(v), input, tool.secret);
+          headers[k] = fill(String(v), input, secret);
         }
       } catch {
         headers = {};
@@ -62,7 +65,7 @@ export function customToolToDef(tool: CustomTool): ToolDef {
       let body: string | undefined;
       if (hasBody) {
         body = tool.bodyTemplate
-          ? fill(tool.bodyTemplate, input, tool.secret)
+          ? fill(tool.bodyTemplate, input, secret)
           : JSON.stringify(input);
         if (!headers["Content-Type"]) headers["Content-Type"] = "application/json";
       }

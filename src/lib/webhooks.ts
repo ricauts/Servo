@@ -5,6 +5,7 @@
 
 import { createHmac, randomBytes } from "crypto";
 import { db } from "@/lib/db";
+import { open } from "@/lib/secret-store";
 
 /** Event names a webhook can subscribe to ("*" = all). */
 export const WEBHOOK_EVENTS = [
@@ -54,7 +55,8 @@ async function deliver(
       headers: {
         "Content-Type": "application/json",
         "x-servo-event": event,
-        "x-servo-signature": `sha256=${signPayload(webhook.secret, body)}`,
+        // Stored encrypted at rest; opened only at signing time.
+        "x-servo-signature": `sha256=${signPayload(open(webhook.secret), body)}`,
       },
       body,
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

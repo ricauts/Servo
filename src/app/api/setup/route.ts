@@ -6,6 +6,7 @@ import { USER_COOKIE } from "@/lib/auth";
 import { AUTH_SETTING_KEYS, needsSetup } from "@/lib/authjs";
 import { ensureToolPolicies } from "@/lib/ai/custom-tools";
 import { ensureSlaPolicies } from "@/lib/sla";
+import { ensureOpsSchema, syncAgentProfiles } from "@/lib/bootstrap";
 
 export const dynamic = "force-dynamic";
 
@@ -88,6 +89,8 @@ export async function POST(req: NextRequest) {
 
   await ensureToolPolicies();
   await ensureSlaPolicies();
+  await syncAgentProfiles();
+  await ensureOpsSchema();
 
   // Demo-mode installs act as the new admin immediately; OIDC installs go
   // through /login next.

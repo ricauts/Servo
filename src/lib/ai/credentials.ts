@@ -5,6 +5,7 @@
 
 import type { AgentProfile, AiCredential } from "@prisma/client";
 import { db } from "@/lib/db";
+import { open } from "@/lib/secret-store";
 import {
   getAiSettings,
   ZAI_DEFAULT_MODEL,
@@ -43,7 +44,9 @@ export async function settingsForProfile(
       ...base,
       provider,
       configuredProvider: provider,
-      apiKey: credential.apiKey,
+      // Stored encrypted at rest; nested include reads skip the db-layer
+      // decryption, so this single consumer opens it.
+      apiKey: open(credential.apiKey),
       baseUrl: credential.baseUrl || undefined,
       model:
         credential.model || (provider === "zai" ? ZAI_DEFAULT_MODEL : base.model),

@@ -1,0 +1,89 @@
+# Security
+
+Servo is a self-hosted service desk that stores credentials for the systems
+it integrates with and lets AI agents act on them behind human approval
+gates. This document describes the security model, what you must configure
+for production, and what is intentionally out of scope today.
+
+## Reporting a vulnerability
+
+Open a GitHub security advisory on this repository (Security → Advisories →
+Report a vulnerability) rather than a public issue.
+
+## Secrets
+
+**Where they live.** Integration credentials (model API keys, GitHub PAT,
+Azure client secret, SMTP URL, OIDC client secret, MCP/inbound tokens,
+credential-pool keys, custom-tool secrets, webhook signing secrets) are
+stored in the SQLite database. They are **never returned by any API** — the
+settings endpoints redact them structurally (`tokenSet: true`, never the
+value).
+
+**Encryption at rest.** Set `SERVO_ENCRYPTION_KEY` (64 hex chars, 32-byte
+base64, or a long passphrase) and every secret is sealed with AES-256-GCM
+before it is written; values are decrypted only at the moment of use.
+Rows written before the key existed stay readable (legacy plaintext passes
+through) — migrate them once with:
+
+```bash
+node scripts/encrypt-secrets.cjs
+```
+
+Losing the key means re-entering the secrets; it is never stored anywhere by
+Servo. Environment-variable credentials (`ANTHROPIC_API_KEY`, `GITHUB_TOKEN`,
+`SMTP_URL`…) always win over stored ones and never touch the database.
+
+**Least privilege for integration credentials:**
+
+- GitHub: a **fine-grained PAT** with Contents (and Administration only if
+  the resolver should create repositories) on the specific repositories.
+- Azure: a service principal with the **Reader** role only — the mutating
+  cloud tools are simulated by design.
+- Mail: an **app password** for a dedicated mailbox, not a user's password.
+- Rotate anything you ever pasted into a chat, a ticket or a terminal.
+
+## Authentication & authorization
+
+- **Real sign-in** is any OIDC IdP (Google, Entra ID, Okta, Keycloak…).
+  Set `AUTH_SECRET` in production — session cookies are signed with it.
+- **`AUTH_ALLOWED_DOMAINS`**: with a public IdP, any account can complete
+  OAuth; this server-side allowlist (plus explicit admin emails) is what
+  keeps strangers out. Set it unless your IdP is org-internal.
+- **Demo mode** (no OIDC config) is an authentication-free user switcher for
+  local evaluation. Never expose a demo-mode install to a network you do not
+  trust.
+- **Roles**: REQUESTERs only see their own tickets (pages and API). Agents
+  and admins see the queue; HIGH-risk approvals and settings are admin-only.
+- Locked out by a bad SSO config: `node scripts/reset-sso.cjs`.
+
+## AI agents & tools
+
+- Every tool carries a risk level and an optional **human-approval gate**
+  (defaults in `src/lib/ai/tool-policies.ts`, editable per install); HIGH-risk
+  approvals are admin-only, and QA reviews risky runs.
+- Read-only SQL is enforced at the driver (`PRAGMA query_only`), not just by
+  keyword filtering; mutating SQL defaults to requiring approval.
+- Agents that cannot complete an objective **escalate to a human** — an
+  unmet objective is never marked resolved.
+- The MCP endpoint and the inbound-email webhook are disabled until you set
+  their bearer/shared secrets; use long random values.
+- Prompt-injection caution: ticket text reaches the models. The approval
+  gates on risky tools are the mitigation — do not disable them for tools
+  that can mutate systems, and treat the tool allowlist per agent as a
+  security boundary.
+
+## Transport & deployment
+
+- Run behind HTTPS (reverse proxy); set `APP_URL` so links are correct.
+- SQLite files (`/data` in Docker) hold your tickets and sealed secrets —
+  restrict filesystem access and back them up accordingly.
+- Webhook payloads are HMAC-SHA256 signed (`x-servo-signature`); verify on
+  the receiving end.
+
+## Known limitations (roadmap)
+
+- No rate limiting on the HTTP surface yet — front with a proxy/WAF if
+  exposed publicly.
+- Audit trail is the ticket/run timeline; there is no separate immutable
+  audit log.
+- Single-tenant by design today.

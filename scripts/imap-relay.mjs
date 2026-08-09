@@ -2,7 +2,7 @@
 // Workspace, Outlook, Fastmail…) into tickets by forwarding unseen messages
 // to POST /api/inbound/email. Run it next to Servo (or as a container):
 //
-//   IMAP_HOST=imap.gmail.com IMAP_USER=tickets@servoai.org \
+//   IMAP_HOST=imap.gmail.com IMAP_USER=tickets@company.com \
 //   IMAP_PASSWORD=<app-password> SERVO_URL=http://localhost:3000 \
 //   INBOUND_EMAIL_SECRET=<shared secret> node scripts/imap-relay.mjs
 //
