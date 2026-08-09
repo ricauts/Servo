@@ -1,0 +1,142 @@
+// Servo as an MCP server: exposes the tool registry (minus the ticket-bound
+// core tools) plus two Servo-native tools over the Model Context Protocol,
+// so external MCP clients — Claude Code/Desktop, other agents — can operate
+// the service desk. Transport is Streamable HTTP in stateless JSON mode.
+//
+// Auth follows the integration pattern: env MCP_TOKEN wins over the token
+// stored in Settings; without any token the endpoint refuses to serve.
+
+import { db } from "@/lib/db";
+import { getToolRegistry } from "@/lib/ai/custom-tools";
+import { CORE_TOOLS } from "@/lib/agent-profiles";
+import { getAiSettings } from "@/lib/ai/settings";
+import { applySlaToTicket } from "@/lib/sla";
+import { emitTicketEvent } from "@/lib/webhooks";
+import { notifyTicketCreated } from "@/lib/notify";
+import { runTriage } from "@/lib/ai/engine";
+import { nextTicketNumber } from "@/lib/tickets";
+import type { ToolContext, ToolDef } from "@/lib/ai/tools";
+
+export const MCP_SETTING_KEYS = {
+  token: "integration.mcp.token", // never returned by the API
+} as const;
+
+export interface McpConfig {
+  token: string;
+  tokenSource: "env" | "db" | "none";
+}
+
+export async function getMcpConfig(): Promise<McpConfig> {
+  const row = await db.setting.findUnique({ where: { key: MCP_SETTING_KEYS.token } });
+  const envToken = process.env.MCP_TOKEN ?? "";
+  const dbToken = row?.value ?? "";
+  return {
+    token: envToken || dbToken,
+    tokenSource: envToken ? "env" : dbToken ? "db" : "none",
+  };
+}
+
+/** Servo-native MCP tools: file and find tickets from any MCP client. */
+const NATIVE_TOOLS: Record<string, ToolDef> = {
+  create_ticket: {
+    name: "create_ticket",
+    description:
+      "Create a ticket in the Servo service desk. It is triaged automatically (category, priority, routing).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Short ticket title." },
+        description: { type: "string", description: "What happened / what is needed." },
+      },
+      required: ["title", "description"],
+    },
+    async execute(input) {
+      const title = String(input.title ?? "").trim();
+      const description = String(input.description ?? "").trim();
+      if (!title || !description) return "Error: title and description are required.";
+      const requester = await db.user.findFirst({
+        where: { role: "ADMIN" },
+        orderBy: { createdAt: "asc" },
+      });
+      if (!requester) return "Error: no users exist yet — run the setup first.";
+      const ticket = await db.ticket.create({
+        data: {
+          number: await nextTicketNumber(),
+          title: title.slice(0, 200),
+          description,
+          status: "OPEN",
+          priority: "MEDIUM",
+          category: "OTHER",
+          requesterId: requester.id,
+        },
+      });
+      await applySlaToTicket(ticket.id);
+      void notifyTicketCreated(ticket.id);
+      void emitTicketEvent("ticket.created", ticket.id);
+      const { autoTriage } = await getAiSettings();
+      if (autoTriage) {
+        try {
+          await runTriage(ticket.id);
+        } catch {
+          /* triage failure must not fail creation */
+        }
+      }
+      const fresh = await db.ticket.findUnique({ where: { id: ticket.id } });
+      return `Ticket #${ticket.number} created (status ${fresh?.status ?? "OPEN"}, priority ${fresh?.priority ?? "MEDIUM"}, category ${fresh?.category ?? "OTHER"}).`;
+    },
+  },
+
+  search_tickets: {
+    name: "search_tickets",
+    description: "Search Servo tickets by text in the title or description (top 10, newest first).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Text to search for." },
+      },
+      required: ["query"],
+    },
+    async execute(input) {
+      const query = String(input.query ?? "").trim();
+      if (!query) return "Error: query is required.";
+      const tickets = await db.ticket.findMany({
+        where: {
+          OR: [{ title: { contains: query } }, { description: { contains: query } }],
+        },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: { number: true, title: true, status: true, priority: true, category: true },
+      });
+      if (tickets.length === 0) return `No tickets match "${query}".`;
+      return tickets
+        .map((t) => `#${t.number} [${t.status}/${t.priority}/${t.category}] ${t.title}`)
+        .join("\n");
+    },
+  },
+};
+
+/** Tools served over MCP: registry minus the run-bound core tools, plus the
+ * Servo-native ones. Availability still respects disabled tool policies. */
+export async function getMcpTools(): Promise<Record<string, ToolDef>> {
+  const [registry, policies] = await Promise.all([
+    getToolRegistry(),
+    db.toolPolicy.findMany({ where: { enabled: false }, select: { toolName: true } }),
+  ]);
+  const disabled = new Set(policies.map((p) => p.toolName));
+  const served: Record<string, ToolDef> = {};
+  for (const [name, tool] of Object.entries(registry)) {
+    if (CORE_TOOLS.includes(name) || disabled.has(name)) continue;
+    served[name] = tool;
+  }
+  return { ...served, ...NATIVE_TOOLS };
+}
+
+/** Context for MCP-invoked executions. Only the (excluded) core tools read
+ * the ticket/run fields; the agent identity is the system resolver. */
+export async function mcpToolContext(): Promise<ToolContext | null> {
+  const agentUser = await db.user.findFirst({
+    where: { role: "AI_AGENT", aiKind: "RESOLVER" },
+  });
+  if (!agentUser) return null;
+  return { ticketId: "mcp-external", runId: "mcp-external", agentUser };
+}

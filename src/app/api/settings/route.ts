@@ -8,6 +8,7 @@ import { getGithubConfig, GITHUB_SETTING_KEYS } from "@/lib/integrations/github"
 import { azureConfigured, getAzureConfig, AZURE_SETTING_KEYS } from "@/lib/integrations/azure";
 import { getInboundConfig, INBOUND_SETTING_KEYS } from "@/lib/inbound-email";
 import { AUTH_SETTING_KEYS } from "@/lib/authjs";
+import { getMcpConfig, MCP_SETTING_KEYS } from "@/lib/mcp";
 import { forbid } from "@/lib/permissions";
 import { SETTING_KEYS } from "@/lib/types";
 
@@ -22,14 +23,16 @@ async function settingsPayload() {
     if (row.key === AZURE_SETTING_KEYS.clientSecret) continue; // never leak the secret
     if (row.key === INBOUND_SETTING_KEYS.secret) continue; // never leak the secret
     if (row.key === AUTH_SETTING_KEYS.clientSecret) continue; // never leak the secret
+    if (row.key === MCP_SETTING_KEYS.token) continue; // never leak the token
     settings[row.key] = row.value;
   }
-  const [ai, smtp, github, azure, inbound] = await Promise.all([
+  const [ai, smtp, github, azure, inbound, mcp] = await Promise.all([
     getAiSettings(),
     getSmtpConfig(),
     getGithubConfig(),
     getAzureConfig(),
     getInboundConfig(),
+    getMcpConfig(),
   ]);
   const toolPolicies = await db.toolPolicy.findMany({ orderBy: { toolName: "asc" } });
   return {
@@ -44,6 +47,8 @@ async function settingsPayload() {
     azureSecretSource: azure.secretSource,
     inboundSecretSet: inbound.secret.length > 0,
     inboundSecretSource: inbound.secretSource,
+    mcpTokenSet: mcp.token.length > 0,
+    mcpTokenSource: mcp.tokenSource,
     toolPolicies,
   };
 }
@@ -80,6 +85,7 @@ const putSchema = z.object({
   authClientSecret: z.string().optional(), // empty string disables SSO
   authProviderName: z.string().optional(),
   authAdminEmails: z.string().optional(),
+  mcpToken: z.string().optional(), // empty string disables the MCP endpoint
 });
 
 /** PUT /api/settings — upsert any subset of the AI settings (admin only). */
@@ -143,6 +149,7 @@ export async function PUT(req: NextRequest) {
   if (data.authClientSecret !== undefined) updates.push({ key: AUTH_SETTING_KEYS.clientSecret, value: data.authClientSecret });
   if (data.authProviderName !== undefined) updates.push({ key: AUTH_SETTING_KEYS.providerName, value: data.authProviderName });
   if (data.authAdminEmails !== undefined) updates.push({ key: AUTH_SETTING_KEYS.adminEmails, value: data.authAdminEmails });
+  if (data.mcpToken !== undefined) updates.push({ key: MCP_SETTING_KEYS.token, value: data.mcpToken });
 
   for (const update of updates) {
     await db.setting.upsert({

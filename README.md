@@ -33,6 +33,7 @@ Bring your own Anthropic API key for real model calls — or run entirely offlin
 - **Outbound webhooks** — stream `ticket.created/resolved/escalated` and `approval.pending/decided` to any endpoint as signed JSON (`x-servo-signature: sha256=HMAC(secret, body)`). Manage endpoints and subscriptions from Settings, send test pings, and watch a per-endpoint delivery log with latencies.
 - **Command palette (Ctrl/⌘ K)** — search tickets by number, title, or text and jump to any page from the keyboard, anywhere in the app.
 - **Email in and out** — outbound: ticket received / resolved to the requester and pending approvals to every admin, over any SMTP server (`SMTP_URL` or Settings, with a test-send button); sending is best-effort so a broken mail setup never blocks ticket flows. Inbound: point a provider webhook (SendGrid Inbound Parse, Mailgun, Postmark) at `POST /api/inbound/email` — or, for Gmail / Google Workspace, run the bundled `scripts/imap-relay.mjs` against the mailbox — and mail becomes tickets — unknown senders are created as requesters, and a subject carrying `#1029` files the message as a comment on that ticket instead.
+- **MCP server** — Servo speaks the Model Context Protocol: point any MCP client (Claude Code, Claude Desktop, other agents) at `POST /api/mcp` with a bearer token (Integrations -> MCP server) and it can file and search tickets (`create_ticket`, `search_tickets`) and operate the whole tool registry — custom tools included, ticket-bound core tools and policy-disabled tools excluded.
 - **Custom tools & integrations** — admins define new HTTP tools from Settings (method, URL, headers, body template with `{input.field}` placeholders, and a stored secret injected via `{secret}`). They join the resolver's registry like built-in tools, with the same risk levels and human-approval gates — the fastest path to integrating a webhook, an internal API, or a SaaS endpoint.
 - **Specialized agents as `.md` files** — resolver personas (Analytics, Developer, Cybersecurity…) are Markdown documents with YAML frontmatter (`name`, `categories`, `tools`) and a system-prompt body. Drop files into `agents/` or create/edit them from the UI; the resolver automatically uses the enabled specialist covering the ticket's category. A **visual tool picker** per agent (checkboxes with each tool's risk and approval policy) narrows what it may call — no YAML editing — while core tools stay always-on and the .md frontmatter is rewritten to match.
 - **Role-based permissions** — ADMIN, AGENT, and REQUESTER roles with a permission matrix; HIGH-risk approvals and group management are admin-only.
@@ -147,7 +148,8 @@ src/
     agents/            # specialized .md agent profiles
     settings/          # BYOK + tool policies (admin only)
   lib/
-    ai/                # provider abstraction, mock provider, tools, prompts, engine
+    ai/                # provider abstraction, mock provider, prompts, engine, credential pool
+    ai/tools/          # built-in tool registry, one module per domain
     db.ts / opsdb.ts   # app DB and sandboxed ops DB clients
     auth.ts            # cookie-based demo auth
     permissions.ts     # role/action matrix + approval risk rules

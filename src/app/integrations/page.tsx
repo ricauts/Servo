@@ -17,6 +17,8 @@ import WebhooksManager, {
 import AuthTenantForm, {
   type AuthTenantView,
 } from "@/components/admin/AuthTenantForm";
+import McpForm, { type McpSettingsView } from "@/components/admin/McpForm";
+import { getMcpConfig } from "@/lib/mcp";
 import { getSmtpConfig } from "@/lib/notify";
 import { getInboundConfig } from "@/lib/inbound-email";
 import { getGithubConfig } from "@/lib/integrations/github";
@@ -48,12 +50,13 @@ export default async function IntegrationsPage() {
     );
   }
 
-  const [authConfig, smtp, inbound, github, azure, webhookRows] = await Promise.all([
+  const [authConfig, smtp, inbound, github, azure, mcp, webhookRows] = await Promise.all([
     getAuthConfig(),
     getSmtpConfig(),
     getInboundConfig(),
     getGithubConfig(),
     getAzureConfig(),
+    getMcpConfig(),
     db.webhook.findMany({
       include: { deliveries: { orderBy: { createdAt: "desc" }, take: 5 } },
       orderBy: { createdAt: "asc" },
@@ -93,6 +96,10 @@ export default async function IntegrationsPage() {
     secretSource: azure.secretSource,
     configured: azureConfigured(azure),
   };
+  const mcpView: McpSettingsView = {
+    tokenSet: mcp.token.length > 0,
+    tokenSource: mcp.tokenSource,
+  };
   const webhookViews: WebhookView[] = webhookRows.map((hook) => ({
     id: hook.id,
     url: hook.url,
@@ -118,6 +125,7 @@ export default async function IntegrationsPage() {
     { title: "GitHub", body: <GithubForm initial={githubSettings} /> },
     { title: "Azure (read-only)", body: <AzureForm initial={azureSettings} /> },
     { title: "Outbound webhooks", body: <WebhooksManager webhooks={webhookViews} /> },
+    { title: "MCP server (tools for external agents)", body: <McpForm initial={mcpView} /> },
   ];
 
   return (
