@@ -271,11 +271,12 @@ export class MockProvider implements ChatProvider {
         plan: "The approval was rejected — I'll acknowledge the decision instead of retrying the action.",
       },
       {
-        name: "resolve_ticket",
+        name: "escalate_to_human",
         input: {
-          resolution: "Closed by the AI resolver after approval rejection; human follow-up required.",
+          reason:
+            "The required action was rejected by the human reviewer, so the main objective was not completed. A teammate needs to decide the alternative path.",
         },
-        plan: "Wrapping up with a note that a human needs to follow up.",
+        plan: "The objective was not met — escalating to a human instead of resolving.",
       },
     ];
   }

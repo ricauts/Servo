@@ -8,7 +8,7 @@ import { CATEGORIES } from "@/lib/types";
 
 /** Tools every profile keeps regardless of its allowlist — the resolver
  * cannot communicate or close a ticket without them. */
-export const CORE_TOOLS = ["post_comment", "resolve_ticket"];
+export const CORE_TOOLS = ["post_comment", "resolve_ticket", "escalate_to_human"];
 
 export interface ParsedProfile {
   name: string;

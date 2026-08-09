@@ -88,4 +88,11 @@ export const DEFAULT_TOOL_POLICIES: DefaultToolPolicy[] = [
     riskLevel: "LOW",
     requiresApproval: false,
   },
+  {
+    toolName: "escalate_to_human",
+    description:
+      "Hand the ticket to a human teammate when the main objective could not be completed.",
+    riskLevel: "LOW",
+    requiresApproval: false,
+  },
 ];
