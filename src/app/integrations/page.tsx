@@ -3,8 +3,10 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getAuthConfig } from "@/lib/authjs";
 import PageHeader from "@/components/shell/PageHeader";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import EmptyState from "@/components/legacy/EmptyState";
+import IntegrationsShell, {
+  type IntegrationSection,
+} from "@/components/admin/IntegrationsShell";
 import SmtpForm, { type SmtpSettingsView } from "@/components/admin/SmtpForm";
 import GithubForm, { type GithubSettingsView } from "@/components/admin/GithubForm";
 import AzureForm, { type AzureSettingsView } from "@/components/admin/AzureForm";
@@ -116,17 +118,75 @@ export default async function IntegrationsPage() {
     })),
   }));
 
-  const sections: { title: string; body: React.ReactNode }[] = [
-    { title: "Single sign-on (OIDC)", body: <AuthTenantForm initial={authView} /> },
-    { title: "Email notifications (SMTP)", body: <SmtpForm initial={smtpSettings} /> },
+  const activeWebhooks = webhookViews.filter((w) => w.enabled).length;
+  const off = { label: "Off", tone: "neutral" as const };
+  const sections: IntegrationSection[] = [
     {
-      title: "Inbound email (tickets from a mailbox)",
+      id: "sso",
+      title: "Single sign-on",
+      blurb:
+        "Connect any OIDC identity provider (Google, Entra ID, Okta, Keycloak…). Without a tenant Servo stays in the offline demo mode.",
+      status:
+        authView.mode === "oidc" ? { label: "Active", tone: "good" } : { label: "Demo", tone: "warn" },
+      body: <AuthTenantForm initial={authView} />,
+    },
+    {
+      id: "smtp",
+      title: "Email notifications",
+      blurb:
+        "Outbound mail over any SMTP server: ticket confirmations, resolutions, approval alerts and approved AI replies.",
+      status: smtpSettings.enabled
+        ? { label: "Active", tone: "good" }
+        : smtpSettings.urlSet
+          ? { label: "Paused", tone: "warn" }
+          : off,
+      body: <SmtpForm initial={smtpSettings} />,
+    },
+    {
+      id: "inbound",
+      title: "Inbound email",
+      blurb:
+        "Mail becomes tickets: point a provider webhook (or the bundled IMAP relay for Gmail) at POST /api/inbound/email.",
+      status: inboundSettings.enabled
+        ? { label: "Active", tone: "good" }
+        : inboundSettings.secretSet
+          ? { label: "Paused", tone: "warn" }
+          : off,
       body: <InboundEmailForm initial={inboundSettings} />,
     },
-    { title: "GitHub", body: <GithubForm initial={githubSettings} /> },
-    { title: "Azure (read-only)", body: <AzureForm initial={azureSettings} /> },
-    { title: "Outbound webhooks", body: <WebhooksManager webhooks={webhookViews} /> },
-    { title: "MCP server (tools for external agents)", body: <McpForm initial={mcpView} /> },
+    {
+      id: "github",
+      title: "GitHub",
+      blurb:
+        "Personal access token for real repository, branch and pull-request tools; without one they run simulated.",
+      status: githubSettings.tokenSet ? { label: "Connected", tone: "good" } : off,
+      body: <GithubForm initial={githubSettings} />,
+    },
+    {
+      id: "azure",
+      title: "Azure",
+      blurb:
+        "Read-only service principal (Reader role) for live Resource Manager queries; mutations stay simulated behind approvals.",
+      status: azureSettings.configured ? { label: "Connected", tone: "good" } : off,
+      body: <AzureForm initial={azureSettings} />,
+    },
+    {
+      id: "webhooks",
+      title: "Outbound webhooks",
+      blurb:
+        "Stream ticket, approval and reply events to any endpoint as HMAC-signed JSON, with a per-endpoint delivery log.",
+      status:
+        activeWebhooks > 0 ? { label: `${activeWebhooks} active`, tone: "good" } : off,
+      body: <WebhooksManager webhooks={webhookViews} />,
+    },
+    {
+      id: "mcp",
+      title: "MCP server",
+      blurb:
+        "Servo as a Model Context Protocol server: external agents file and search tickets and operate the tool registry.",
+      status: mcpView.tokenSet ? { label: "Active", tone: "good" } : off,
+      body: <McpForm initial={mcpView} />,
+    },
   ];
 
   return (
@@ -135,16 +195,7 @@ export default async function IntegrationsPage() {
         title="Integrations"
         description="Connect Servo to your identity provider, mail, code and cloud — every credential stays server-side and is never returned by the API."
       />
-      <div className="max-w-4xl space-y-4 p-4 md:p-8">
-        {sections.map((section) => (
-          <Card key={section.title}>
-            <CardHeader>
-              <CardTitle>{section.title}</CardTitle>
-            </CardHeader>
-            <CardContent>{section.body}</CardContent>
-          </Card>
-        ))}
-      </div>
+      <IntegrationsShell sections={sections} />
     </>
   );
 }
