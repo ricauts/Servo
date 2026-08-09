@@ -69,6 +69,7 @@ export default async function IntegrationsPage() {
     clientId: authConfig.clientId,
     providerName: authConfig.providerName,
     adminEmails: authConfig.adminEmails.join(", "),
+    allowedDomains: authConfig.allowedDomains.join(", "),
     secretSet: authConfig.clientSecret.length > 0,
     secretSource: authConfig.secretSource,
   };

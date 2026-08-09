@@ -85,6 +85,7 @@ const putSchema = z.object({
   authClientSecret: z.string().optional(), // empty string disables SSO
   authProviderName: z.string().optional(),
   authAdminEmails: z.string().optional(),
+  authAllowedDomains: z.string().optional(), // empty string = any domain may sign in
   mcpToken: z.string().optional(), // empty string disables the MCP endpoint
 });
 
@@ -149,6 +150,9 @@ export async function PUT(req: NextRequest) {
   if (data.authClientSecret !== undefined) updates.push({ key: AUTH_SETTING_KEYS.clientSecret, value: data.authClientSecret });
   if (data.authProviderName !== undefined) updates.push({ key: AUTH_SETTING_KEYS.providerName, value: data.authProviderName });
   if (data.authAdminEmails !== undefined) updates.push({ key: AUTH_SETTING_KEYS.adminEmails, value: data.authAdminEmails });
+  if (data.authAllowedDomains !== undefined) {
+    updates.push({ key: AUTH_SETTING_KEYS.allowedDomains, value: data.authAllowedDomains });
+  }
   if (data.mcpToken !== undefined) updates.push({ key: MCP_SETTING_KEYS.token, value: data.mcpToken });
 
   for (const update of updates) {

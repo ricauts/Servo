@@ -84,6 +84,13 @@ The container creates and seeds its SQLite databases on a named volume (`/data`)
 
 Servo ships with real sign-in for self-hosted deployments: connect any OIDC identity provider (Entra ID, Google, Okta, Keycloak, Auth0...) via env vars or from **Integrations -> Single sign-on**. Users are provisioned on first sign-in (REQUESTER by default; `AUTH_ADMIN_EMAILS` keeps admins), roles are managed from **Settings -> Team**, and a **first-run setup wizard** (`/setup`) bootstraps fresh installs: the first admin, the system AI agents, default policies, and (optionally) your SSO tenant. Without OIDC config Servo stays in the offline demo mode with the user switcher. For local development, `node scripts/mock-idp.mjs you@x.com` starts a throwaway IdP.
 
+Hardening and recovery:
+
+- **Allowed email domains** (`AUTH_ALLOWED_DOMAINS` or Integrations -> SSO): when set, only accounts on those domains — plus the explicit admin emails — can sign in. Set it whenever your IdP will authenticate accounts outside your org (e.g. Google with an external consent screen); rejected sign-ins land back on `/login` with a clear message and are never provisioned.
+- **Locked out by a bad SSO config?** `node scripts/reset-sso.cjs` clears the OIDC tenant (keeping admin emails/domains) and drops Servo back to demo mode so you can fix it from `/integrations`.
+
+Google Workspace example: create an OAuth client (type *Web application*) in [Google Cloud Console](https://console.cloud.google.com/auth/clients) with redirect URI `<servo-url>/api/auth/callback/oidc`, keep the consent screen **Internal**, then save issuer `https://accounts.google.com` + client ID + secret in Integrations.
+
 Integrations now live on their own page (`/integrations`): SSO, email in/out, GitHub, Azure, and outbound webhooks.
 
 ## Bring your own key (BYOK)

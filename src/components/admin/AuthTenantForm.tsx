@@ -21,6 +21,7 @@ export interface AuthTenantView {
   clientId: string;
   providerName: string;
   adminEmails: string;
+  allowedDomains: string;
   secretSet: boolean;
   secretSource: "env" | "db" | "none";
 }
@@ -32,6 +33,7 @@ export default function AuthTenantForm({ initial }: { initial: AuthTenantView })
   const [secret, setSecret] = useState("");
   const [providerName, setProviderName] = useState(initial.providerName);
   const [adminEmails, setAdminEmails] = useState(initial.adminEmails);
+  const [allowedDomains, setAllowedDomains] = useState(initial.allowedDomains);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,6 +45,7 @@ export default function AuthTenantForm({ initial }: { initial: AuthTenantView })
       authClientId: clientId.trim(),
       authProviderName: providerName.trim(),
       authAdminEmails: adminEmails.trim(),
+      authAllowedDomains: allowedDomains.trim(),
     };
     if (extra) body.authClientSecret = extra.authClientSecret;
     else if (secret.trim() !== "") body.authClientSecret = secret.trim();
@@ -166,6 +169,24 @@ export default function AuthTenantForm({ initial }: { initial: AuthTenantView })
             Comma-separated. These accounts get (and keep) the ADMIN role when
             they sign in; everyone else starts as REQUESTER and can be promoted
             from Settings → Team.
+          </p>
+        </div>
+        <div className="flex flex-col gap-1.5 sm:col-span-2">
+          <Label htmlFor="sso-domains" className="font-heading">
+            Allowed email domains
+          </Label>
+          <Input
+            id="sso-domains"
+            value={allowedDomains}
+            onChange={(e) => setAllowedDomains(e.target.value)}
+            placeholder="company.com, subsidiary.com"
+            disabled={busy}
+          />
+          <p className="text-xs text-muted-foreground">
+            Comma-separated. When set, only accounts on these domains (plus the
+            admin emails above) can sign in — recommended whenever the IdP
+            accepts accounts outside your organization. Empty allows any
+            account your IdP authenticates.
           </p>
         </div>
       </div>

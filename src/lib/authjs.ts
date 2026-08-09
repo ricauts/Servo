@@ -8,6 +8,7 @@
 
 import NextAuth from "next-auth";
 import { db } from "@/lib/db";
+import { isEmailAllowed, parseList } from "@/lib/auth-rules";
 
 export const AUTH_SETTING_KEYS = {
   issuer: "auth.oidc.issuer",
@@ -15,6 +16,7 @@ export const AUTH_SETTING_KEYS = {
   clientSecret: "auth.oidc.clientSecret", // never returned by the API
   providerName: "auth.oidc.providerName",
   adminEmails: "auth.adminEmails", // comma-separated; auto-ADMIN at sign-in
+  allowedDomains: "auth.allowedDomains", // comma-separated; empty = any domain
 } as const;
 
 export interface AuthConfig {
@@ -24,6 +26,7 @@ export interface AuthConfig {
   clientSecret: string;
   providerName: string;
   adminEmails: string[];
+  allowedDomains: string[];
   secretSource: "env" | "db" | "none";
 }
 
@@ -44,10 +47,12 @@ export async function getAuthConfig(): Promise<AuthConfig> {
     clientSecret,
     providerName:
       process.env.OIDC_PROVIDER_NAME || map.get(AUTH_SETTING_KEYS.providerName) || "SSO",
-    adminEmails: (process.env.AUTH_ADMIN_EMAILS || map.get(AUTH_SETTING_KEYS.adminEmails) || "")
-      .split(",")
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean),
+    adminEmails: parseList(
+      process.env.AUTH_ADMIN_EMAILS || map.get(AUTH_SETTING_KEYS.adminEmails) || "",
+    ),
+    allowedDomains: parseList(
+      process.env.AUTH_ALLOWED_DOMAINS || map.get(AUTH_SETTING_KEYS.allowedDomains) || "",
+    ),
     secretSource: envSecret ? "env" : dbSecret ? "db" : "none",
   };
 }
@@ -63,7 +68,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
     // Production deployments must set AUTH_SECRET (see .env.example); the
     // fallback keeps offline demo installs booting.
     secret: process.env.AUTH_SECRET ?? "servo-insecure-dev-secret-set-AUTH_SECRET",
-    pages: { signIn: "/login" },
+    pages: { signIn: "/login", error: "/login" },
     providers:
       config.mode === "oidc"
         ? [
@@ -82,6 +87,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
       async signIn({ profile, user }) {
         const email = (profile?.email ?? user?.email)?.toLowerCase();
         if (!email) return false;
+        if (!isEmailAllowed(email, config)) return false;
         const existing = await db.user.findUnique({ where: { email } });
         const shouldBeAdmin = config.adminEmails.includes(email);
         if (!existing) {
