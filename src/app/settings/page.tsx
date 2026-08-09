@@ -113,6 +113,7 @@ export default async function SettingsPage() {
     baseUrl: ai.baseUrl ?? "",
     model: ai.model,
     autoTriage: ai.autoTriage,
+    autoDraft: ai.autoDraft,
     qaEnabled: ai.qaEnabled,
     apiKeySet: ai.apiKey.length > 0,
     keySource: ai.keySource,

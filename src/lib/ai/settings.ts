@@ -31,6 +31,8 @@ export interface AiSettings {
   baseUrl?: string;
   model: string;
   autoTriage: boolean;
+  /** Draft a reply for review whenever an inbound email opens a ticket. */
+  autoDraft: boolean;
   qaEnabled: boolean;
   keySource: "env" | "db" | "none";
 }
@@ -90,6 +92,7 @@ export async function getAiSettings(): Promise<AiSettings> {
     baseUrl,
     model: map.get(SETTING_KEYS.model) || DEFAULT_MODEL,
     autoTriage: (map.get(SETTING_KEYS.autoTriage) ?? "true") === "true",
+    autoDraft: (map.get(SETTING_KEYS.autoDraft) ?? "true") === "true",
     qaEnabled: (map.get(SETTING_KEYS.qaEnabled) ?? "true") === "true",
     keySource,
   };

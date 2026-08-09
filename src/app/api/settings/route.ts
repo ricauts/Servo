@@ -67,6 +67,7 @@ const putSchema = z.object({
   baseUrl: z.string().optional(),
   model: z.string().optional(),
   autoTriage: z.boolean().optional(),
+  autoDraft: z.boolean().optional(),
   qaEnabled: z.boolean().optional(),
   smtpEnabled: z.boolean().optional(),
   smtpUrl: z.string().optional(), // empty string clears the stored URL
@@ -109,6 +110,9 @@ export async function PUT(req: NextRequest) {
   if (data.model !== undefined) updates.push({ key: SETTING_KEYS.model, value: data.model });
   if (data.autoTriage !== undefined) {
     updates.push({ key: SETTING_KEYS.autoTriage, value: String(data.autoTriage) });
+  }
+  if (data.autoDraft !== undefined) {
+    updates.push({ key: SETTING_KEYS.autoDraft, value: String(data.autoDraft) });
   }
   if (data.qaEnabled !== undefined) {
     updates.push({ key: SETTING_KEYS.qaEnabled, value: String(data.qaEnabled) });

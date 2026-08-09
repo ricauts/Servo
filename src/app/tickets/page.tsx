@@ -4,6 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import EmptyState from "@/components/legacy/EmptyState";
 import { db } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
 import PageHeader from "@/components/shell/PageHeader";
 import TicketFilters from "@/components/tickets/TicketFilters";
 import TicketsTable, {
@@ -51,6 +52,12 @@ export default async function TicketsPage({
     : "";
 
   const where: Prisma.TicketWhereInput = {};
+  // Requesters only ever see their own tickets — with real SSO, any employee
+  // in the IdP can sign in, and one requester's thread is not another's.
+  const currentUser = await getCurrentUser();
+  if (currentUser.role === "REQUESTER") {
+    where.requesterId = currentUser.id;
+  }
   if (status === "OPEN_ALL") {
     where.status = { notIn: ["RESOLVED", "CLOSED"] };
   } else if (status) {

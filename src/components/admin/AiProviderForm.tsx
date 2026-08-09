@@ -24,6 +24,7 @@ export interface AiSettingsView {
   baseUrl: string;
   model: string;
   autoTriage: boolean;
+  autoDraft: boolean;
   qaEnabled: boolean;
   apiKeySet: boolean;
   keySource: "env" | "db" | "none";
@@ -66,6 +67,7 @@ export default function AiProviderForm({ initial }: { initial: AiSettingsView })
   const [baseUrl, setBaseUrl] = useState(initial.baseUrl);
   const [model, setModel] = useState(initial.model);
   const [autoTriage, setAutoTriage] = useState(initial.autoTriage);
+  const [autoDraft, setAutoDraft] = useState(initial.autoDraft);
   const [qaEnabled, setQaEnabled] = useState(initial.qaEnabled);
   const [apiKeySet, setApiKeySet] = useState(initial.apiKeySet);
   const [keySource, setKeySource] = useState(initial.keySource);
@@ -91,6 +93,7 @@ export default function AiProviderForm({ initial }: { initial: AiSettingsView })
       baseUrl,
       model,
       autoTriage,
+      autoDraft,
       qaEnabled,
     };
     if (extra) {
@@ -321,6 +324,17 @@ export default function AiProviderForm({ initial }: { initial: AiSettingsView })
           />
           <Label htmlFor="ai-auto-triage" className="font-heading">
             Auto-triage new tickets
+          </Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch
+            id="ai-auto-draft"
+            checked={autoDraft}
+            onCheckedChange={(checked) => setAutoDraft(checked)}
+            disabled={busy}
+          />
+          <Label htmlFor="ai-auto-draft" className="font-heading">
+            Draft replies for inbound email
           </Label>
         </div>
         <div className="flex items-center gap-2">

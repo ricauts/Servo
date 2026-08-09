@@ -11,7 +11,7 @@ import type { AssistantTurn, ChatProvider, ToolSpec } from "./provider";
 
 export interface MockContext {
   ticket: Ticket & { requester: User };
-  kind: "TRIAGE" | "RESOLVE" | "QA";
+  kind: "TRIAGE" | "RESOLVE" | "QA" | "DRAFT";
 }
 
 interface ScriptStep {
@@ -70,6 +70,9 @@ export class MockProvider implements ChatProvider {
     if (this.ctx.kind === "TRIAGE") {
       return { text: this.triageJson(), toolCalls: [] };
     }
+    if (this.ctx.kind === "DRAFT") {
+      return { text: this.draftReplyText(), toolCalls: [] };
+    }
     if (this.ctx.kind === "QA") {
       return {
         text: JSON.stringify({
@@ -112,7 +115,8 @@ export class MockProvider implements ChatProvider {
     } else if (/table|database|sql|schema|query/i.test(text)) {
       category = "DATABASE";
       assignTo = "AI";
-    } else if (/deploy|repo|repository|pipeline|\bci\b|cloud|azure|aws|gcp/i.test(text)) {
+    } else if (/deploy|\brepos?\b|repository|pipeline|\bci\b|cloud|azure|aws|gcp/i.test(text)) {
+      // \brepo\b, not /repo/: Spanish "reporte" must not read as DEVOPS.
       category = "DEVOPS";
       assignTo = "AI";
     } else if (/wifi|vpn|network|dns|signal|connection/i.test(text)) {
@@ -136,6 +140,31 @@ export class MockProvider implements ChatProvider {
         : "The request needs human attention, so it stays in the human queue.");
 
     return JSON.stringify({ category, priority, assignTo, rationale });
+  }
+
+  // -- DRAFT ----------------------------------------------------------------
+
+  /** Deterministic reply draft so the approve-and-send flow works offline. */
+  private draftReplyText(): string {
+    const ticket = this.ctx.ticket;
+    const text = `${ticket.title} ${ticket.description}`;
+    const first = ticket.requester.name.split(" ")[0];
+    let plan =
+      "We've received your request and a teammate is looking into it. We'll follow up on this same thread as soon as we have an update.";
+    if (/password|mfa|locked|2fa/i.test(text)) {
+      plan =
+        "We can reset your access right away. You'll receive a recovery link at this address within the next few minutes — it expires after 60 minutes, so please use it promptly and set a new password. If it doesn't arrive, check your spam folder and reply here.";
+    } else if (/wifi|vpn|network|dns|connection/i.test(text)) {
+      plan =
+        "We're checking the network side now. In the meantime, please try disconnecting and reconnecting once; if it still fails, reply with the exact error message you see and whether you're on office Wi-Fi or working remotely, and we'll take it from there.";
+    } else if (/device|laptop|monitor|asset|warranty|phone|printer/i.test(text)) {
+      plan =
+        "We've located your device in the inventory and are reviewing its status and warranty. We'll confirm the next step (repair, replacement or configuration) on this thread shortly.";
+    } else if (/install|license|software|app\b|excel|outlook|slack|zoom/i.test(text)) {
+      plan =
+        "We're validating the license and preparing the installation for your account. You'll get a confirmation here once it's ready — no action needed from you for now.";
+    }
+    return `Hi ${first},\n\nThanks for reaching out. ${plan}\n\nBest regards,\nSupport team`;
   }
 
   // -- RESOLVE --------------------------------------------------------------
@@ -188,8 +217,8 @@ export class MockProvider implements ChatProvider {
           "I've applied the requested database change after review. The run trace above shows the exact SQL that was executed.";
         resolution = "Database change executed as requested.";
       }
-    } else if (/deploy|repo|repository|pipeline|\bci\b|cloud|azure|aws|gcp/i.test(text)) {
-      if (/repo/i.test(text)) {
+    } else if (/deploy|\brepos?\b|repository|pipeline|\bci\b|cloud|azure|aws|gcp/i.test(text)) {
+      if (/\brepos?\b|repository/i.test(text)) {
         const name = slug(ticket.title);
         steps.push({
           name: "github_create_repo",

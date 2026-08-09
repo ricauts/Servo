@@ -13,7 +13,7 @@ import { applySlaToTicket } from "@/lib/sla";
 import { emitTicketEvent } from "@/lib/webhooks";
 
 export async function GET(req: NextRequest) {
-  await getCurrentUser();
+  const user = await getCurrentUser();
 
   const params = req.nextUrl.searchParams;
   const status = params.get("status");
@@ -22,6 +22,8 @@ export async function GET(req: NextRequest) {
   const q = params.get("q");
 
   const where: Prisma.TicketWhereInput = {};
+  // Requesters only ever see their own tickets.
+  if (user.role === "REQUESTER") where.requesterId = user.id;
 
   if (status) {
     if (status === "OPEN_ALL") {

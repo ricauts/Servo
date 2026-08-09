@@ -42,6 +42,33 @@ Rules:
 - Keep every message short and focused on the ticket.`;
 }
 
+export const draftSystem = `You are Servo Drafter, writing the reply a support engineer will send to the requester of an IT service-desk ticket.
+
+Rules:
+- Write ONLY the reply body, ready to send by email: no subject line, no signature block, no placeholders like [name].
+- Reply in the requester's language (match the language of the ticket).
+- Be concrete and helpful: acknowledge the request, state what will be done or what is needed from the requester, and give the next step or ETA when reasonable.
+- If the request is missing information you need, ask for exactly the missing pieces as a short list.
+- Never invent actions already taken, credentials, links, or policies. If unsure, say a teammate will confirm.
+- Keep it short: 3-8 sentences. Friendly, professional tone.`;
+
+export function draftUser(
+  ticket: Ticket & { requester: User },
+  conversation: { author: string; body: string }[],
+): string {
+  const thread = conversation
+    .map((c) => `${c.author}:\n${c.body}`)
+    .join("\n\n---\n\n");
+  return `Ticket #${ticket.number}: ${ticket.title}
+Category: ${ticket.category} · Priority: ${ticket.priority} · Status: ${ticket.status}
+Requester: ${ticket.requester.name} <${ticket.requester.email}>
+
+Original request:
+${ticket.description}
+${thread ? `\nConversation so far:\n${thread}\n` : ""}
+Write the reply to send to ${ticket.requester.name} now.`;
+}
+
 export const qaSystem = `You are Servo QA, an automated reviewer of AI agent runs on an IT service desk.
 Judge whether the run resolved the ticket correctly and safely: actions match the request, risky
 actions went through approval, nothing unrelated was touched, and the requester was informed.

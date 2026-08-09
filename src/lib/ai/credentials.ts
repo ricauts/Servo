@@ -54,7 +54,7 @@ export async function settingsForProfile(
 }
 
 export interface UsageMeta {
-  kind: "TRIAGE" | "RESOLVE" | "QA";
+  kind: "TRIAGE" | "RESOLVE" | "QA" | "DRAFT";
   agentName: string;
   credentialName: string;
   provider: string;

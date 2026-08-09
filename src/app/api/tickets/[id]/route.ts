@@ -13,14 +13,15 @@ import { emitTicketEvent } from "@/lib/webhooks";
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
-  await getCurrentUser();
+  const user = await getCurrentUser();
   const { id } = await params;
 
   const ticket = await db.ticket.findUnique({
     where: { id },
     include: ticketDetailInclude,
   });
-  if (!ticket) {
+  // Requesters only ever see their own tickets (404, not 403 — no oracle).
+  if (!ticket || (user.role === "REQUESTER" && ticket.requesterId !== user.id)) {
     return Response.json({ error: "Ticket not found" }, { status: 404 });
   }
   return Response.json({ ticket });
@@ -94,6 +95,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   const updated = await db.ticket.update({ where: { id }, data });
+
+  // Closing invalidates any reply draft still awaiting review — sending a
+  // "reply to continue" email on a closed thread would dead-end (inbound
+  // refuses to comment on CLOSED tickets).
+  if (patch.status === "CLOSED" && ticket.status !== "CLOSED") {
+    await db.replyDraft.updateMany({
+      where: { ticketId: id, status: "PENDING" },
+      data: { status: "REJECTED", decidedAt: new Date() },
+    });
+  }
 
   if (patch.priority !== undefined && patch.priority !== ticket.priority) {
     await applySlaToTicket(id);

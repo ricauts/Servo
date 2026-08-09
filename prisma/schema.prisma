@@ -23,6 +23,7 @@ model User {
   assignedTickets  Ticket[]      @relation("assignee")
   comments         Comment[]
   decisions        Approval[]    @relation("decider")
+  draftDecisions   ReplyDraft[]  @relation("draftDecider")
   memberships      GroupMember[]
 }
 
@@ -76,6 +77,24 @@ model Ticket {
   comments  Comment[]
   runs      AgentRun[]
   approvals Approval[]
+  drafts    ReplyDraft[]
+}
+
+// An AI-drafted reply to the requester awaiting a human decision — the daily
+// support workflow: mail arrives, the AI writes the answer, a human approves
+// (optionally after editing) and Servo emails it out as a public comment.
+model ReplyDraft {
+  id        String    @id @default(cuid())
+  ticketId  String
+  ticket    Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  body      String
+  status    String    @default("PENDING") // PENDING | SENT | REJECTED
+  agentName String    @default("Servo Drafter") // persona that wrote the draft
+  emailed   Boolean   @default(false) // approved reply actually left via SMTP
+  createdAt DateTime  @default(now())
+  decidedAt DateTime?
+  deciderId String?
+  decider   User?     @relation("draftDecider", fields: [deciderId], references: [id])
 }
 
 model Comment {
@@ -183,7 +202,7 @@ model AiUsage {
   credentialName String // pool credential name, "default", or "mock"
   provider       String
   model          String
-  kind           String // TRIAGE | RESOLVE | QA
+  kind           String // TRIAGE | RESOLVE | QA | DRAFT
   agentName      String // system agent or specialized profile name
   inputTokens    Int      @default(0)
   outputTokens   Int      @default(0)

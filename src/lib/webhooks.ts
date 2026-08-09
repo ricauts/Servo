@@ -13,6 +13,7 @@ export const WEBHOOK_EVENTS = [
   "ticket.escalated",
   "approval.pending",
   "approval.decided",
+  "reply.sent",
 ] as const;
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 

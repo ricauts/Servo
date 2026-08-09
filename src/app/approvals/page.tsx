@@ -8,6 +8,9 @@ import EmptyState from "@/components/legacy/EmptyState";
 import ApprovalCard, {
   type PendingApprovalView,
 } from "@/components/admin/ApprovalCard";
+import DraftQueueCard, {
+  type DraftQueueView,
+} from "@/components/admin/DraftQueueCard";
 import ApprovalHistoryTable, {
   type ApprovalHistoryRow,
 } from "@/components/admin/ApprovalHistoryTable";
@@ -43,7 +46,7 @@ export default async function ApprovalsPage() {
     );
   }
 
-  const [pending, decided, aiUsers] = await Promise.all([
+  const [pending, decided, aiUsers, pendingDrafts] = await Promise.all([
     db.approval.findMany({
       where: { status: "PENDING" },
       include: { ticket: true, run: true },
@@ -56,6 +59,11 @@ export default async function ApprovalsPage() {
       take: 50,
     }),
     db.user.findMany({ where: { role: "AI_AGENT" } }),
+    db.replyDraft.findMany({
+      where: { status: "PENDING" },
+      include: { ticket: { include: { requester: true } } },
+      orderBy: { createdAt: "asc" }, // oldest first: answer who has waited longest
+    }),
   ]);
 
   const agentNameById = new Map(aiUsers.map((u) => [u.id, u.name]));
@@ -71,6 +79,20 @@ export default async function ApprovalsPage() {
       id: a.ticket.id,
       number: a.ticket.number,
       title: a.ticket.title,
+    },
+  }));
+
+  const draftViews: DraftQueueView[] = pendingDrafts.map((d) => ({
+    id: d.id,
+    body: d.body,
+    agentName: d.agentName,
+    createdAt: d.createdAt.toISOString(),
+    requesterName: d.ticket.requester.name,
+    ticket: {
+      id: d.ticket.id,
+      number: d.ticket.number,
+      title: d.ticket.title,
+      status: d.ticket.status,
     },
   }));
 
@@ -117,6 +139,30 @@ export default async function ApprovalsPage() {
                     approval={a}
                     canDecide={canDecideApproval(user, a.riskLevel)}
                   />
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section>
+          <div className="flex items-center gap-2">
+            <h2 className="font-heading text-base font-semibold tracking-tight">
+              Reply drafts awaiting review
+            </h2>
+            {draftViews.length > 0 && <Badge tone="brand">{draftViews.length}</Badge>}
+          </div>
+          <div className="mt-3">
+            {draftViews.length === 0 ? (
+              <p className="font-sans text-sm text-muted-foreground">
+                No drafts waiting. When the AI drafts a reply to a requester
+                (automatically for inbound email, or from a ticket), it shows up
+                here for a human to approve and send.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {draftViews.map((d) => (
+                  <DraftQueueCard key={d.id} draft={d} />
                 ))}
               </div>
             )}

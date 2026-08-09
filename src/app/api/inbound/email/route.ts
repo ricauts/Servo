@@ -1,7 +1,9 @@
 import type { NextRequest } from "next/server";
+import { db } from "@/lib/db";
 import { getInboundConfig, ingestEmail } from "@/lib/inbound-email";
 import { getAiSettings } from "@/lib/ai/settings";
 import { runTriage } from "@/lib/ai/engine";
+import { draftReply } from "@/lib/ai/draft";
 import { notifyTicketCreated } from "@/lib/notify";
 import { applySlaToTicket } from "@/lib/sla";
 
@@ -73,15 +75,47 @@ export async function POST(req: NextRequest) {
   if (result.action === "created") {
     await applySlaToTicket(result.ticketId);
     void notifyTicketCreated(result.ticketId);
-    const { autoTriage } = await getAiSettings();
-    if (autoTriage) {
-      try {
-        await runTriage(result.ticketId);
-      } catch (err) {
-        // Triage failure must never reject the delivery — the provider would
-        // retry and duplicate the ticket.
-        console.error(`Auto-triage failed for inbound ticket ${result.ticketId}:`, err);
+    // The AI pipeline (triage, then the reply draft) runs detached: mail
+    // relays and inbound-parse providers time out in seconds and retry on
+    // failure, and two sequential model calls would blow that budget on
+    // every delivery — duplicating the ticket each retry.
+    const { autoTriage, autoDraft } = await getAiSettings();
+    const ticketId = result.ticketId;
+    void (async () => {
+      if (autoTriage) {
+        try {
+          await runTriage(ticketId);
+        } catch (err) {
+          console.error(`Auto-triage failed for inbound ticket ${ticketId}:`, err);
+        }
       }
+      if (autoDraft) {
+        // After triage so the category's specialist drafts on its credential.
+        try {
+          await draftReply(ticketId);
+        } catch (err) {
+          console.error(`Auto-draft failed for inbound ticket ${ticketId}:`, err);
+        }
+      }
+    })();
+  }
+
+  if (result.action === "comment") {
+    // A requester follow-up makes any pending draft stale ("never mind,
+    // please cancel"): regenerate it with the new context, detached.
+    const { autoDraft } = await getAiSettings();
+    const ticketId = result.ticketId;
+    if (autoDraft) {
+      void (async () => {
+        try {
+          const pending = await db.replyDraft.findFirst({
+            where: { ticketId, status: "PENDING" },
+          });
+          if (pending) await draftReply(ticketId);
+        } catch (err) {
+          console.error(`Draft refresh failed for ticket ${ticketId}:`, err);
+        }
+      })();
     }
   }
 

@@ -11,6 +11,8 @@ import EscalatePanel from "@/components/tickets/EscalatePanel";
 import SlaBadge from "@/components/tickets/SlaBadge";
 import PendingApprovalCard from "@/components/tickets/PendingApprovalCard";
 import PropertiesPanel from "@/components/tickets/PropertiesPanel";
+import ReplyDraftCard from "@/components/tickets/ReplyDraftCard";
+import { getSmtpConfig } from "@/lib/notify";
 import RelativeTime from "@/components/tickets/RelativeTime";
 import RunResolverCard from "@/components/tickets/RunResolverCard";
 import RunSummaryCard from "@/components/tickets/RunSummaryCard";
@@ -63,8 +65,20 @@ export default async function TicketDetailPage({
   if (!ticket) notFound();
 
   const currentUser = await getCurrentUser();
+  // A requester can only open their own tickets (agents/admins see all).
+  if (currentUser.role === "REQUESTER" && ticket.requesterId !== currentUser.id) {
+    notFound();
+  }
   const aiUsers = await db.user.findMany({ where: { role: "AI_AGENT" } });
   const agents = Object.fromEntries(aiUsers.map((u) => [u.id, u]));
+
+  const canWorkTicket = can(currentUser, "ticket.update") && ticket.status !== "CLOSED";
+  const [pendingDraft, smtp] = canWorkTicket
+    ? await Promise.all([
+        db.replyDraft.findFirst({ where: { ticketId: ticket.id, status: "PENDING" } }),
+        getSmtpConfig(),
+      ])
+    : [null, null];
 
   const pendingApproval = ticket.approvals.find((a) => a.status === "PENDING");
   const hasActiveRun = ticket.runs.some(
@@ -128,6 +142,15 @@ export default async function TicketDetailPage({
               toolInput={pendingApproval.toolInput}
               riskLevel={pendingApproval.riskLevel as RiskLevel}
               requestedAt={pendingApproval.requestedAt}
+            />
+          )}
+
+          {canWorkTicket && (
+            <ReplyDraftCard
+              ticketId={ticket.id}
+              draft={pendingDraft}
+              requesterName={ticket.requester.name}
+              emailConfigured={Boolean(smtp && smtp.enabled && smtp.url.length > 0)}
             />
           )}
 

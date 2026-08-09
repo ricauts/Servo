@@ -50,6 +50,8 @@ export type StepType =
 
 export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 
+export type DraftStatus = "PENDING" | "SENT" | "REJECTED";
+
 export const TICKET_STATUSES: TicketStatus[] = [
   "OPEN",
   "TRIAGED",
@@ -94,6 +96,7 @@ export const SETTING_KEYS = {
   baseUrl: "ai.baseUrl", // optional provider endpoint
   model: "ai.model", // default "claude-opus-5"
   autoTriage: "ai.autoTriage", // "true" | "false"
+  autoDraft: "ai.autoDraft", // "true" | "false" — draft a reply for inbound-email tickets
   qaEnabled: "ai.qaEnabled", // "true" | "false"
   smtpEnabled: "integration.smtp.enabled", // "true" | "false"
   smtpUrl: "integration.smtp.url", // smtp://user:pass@host:port — env SMTP_URL wins; never returned by the API
