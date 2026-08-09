@@ -45,6 +45,13 @@ export const DEFAULT_TOOL_POLICIES: DefaultToolPolicy[] = [
     requiresApproval: false,
   },
   {
+    toolName: "github_create_branch",
+    description:
+      "Create a feature branch on an existing repository (real API when a token is configured).",
+    riskLevel: "LOW",
+    requiresApproval: false,
+  },
+  {
     toolName: "github_open_pr",
     description: "Open a pull request with proposed changes (real API when a token is configured).",
     riskLevel: "MEDIUM",

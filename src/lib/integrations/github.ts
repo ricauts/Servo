@@ -91,6 +91,39 @@ export async function createRepo(
   return `GitHub error ${result.status}: ${String(result.body.message ?? "request failed")}`;
 }
 
+/** Create a branch on owner/repo from the tip of a base branch. */
+export async function createBranch(
+  config: GithubConfig,
+  input: { repo: string; branch: string; from?: string },
+): Promise<string> {
+  const owner = config.owner;
+  if (!owner) {
+    return "GitHub error: set the default owner in Settings before creating branches.";
+  }
+  const base = input.from ?? "main";
+  const ref = await githubRequest(
+    config,
+    "GET",
+    `/repos/${owner}/${input.repo}/git/ref/heads/${encodeURIComponent(base)}`,
+  );
+  if (ref.status !== 200) {
+    return `GitHub error ${ref.status}: base branch "${base}" not found on ${owner}/${input.repo}.`;
+  }
+  const sha = String((ref.body.object as Record<string, unknown> | undefined)?.sha ?? "");
+  if (!sha) return "GitHub error: could not resolve the base branch commit.";
+  const result = await githubRequest(config, "POST", `/repos/${owner}/${input.repo}/git/refs`, {
+    ref: `refs/heads/${input.branch}`,
+    sha,
+  });
+  if (result.status === 201) {
+    return `Branch created: ${owner}/${input.repo}@${input.branch} (from ${base} @ ${sha.slice(0, 7)}) — https://github.com/${owner}/${input.repo}/tree/${input.branch}`;
+  }
+  if (result.status === 422) {
+    return `GitHub error: branch "${input.branch}" already exists on ${owner}/${input.repo}.`;
+  }
+  return `GitHub error ${result.status}: ${String(result.body.message ?? "request failed")}`;
+}
+
 /** Open a pull request on owner/repo. */
 export async function openPr(
   config: GithubConfig,
