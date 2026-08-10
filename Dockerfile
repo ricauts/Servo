@@ -25,5 +25,8 @@ ENV NODE_ENV=production \
 
 EXPOSE 3000
 
-RUN chmod +x ./scripts/docker-entrypoint.sh
+# Belt and braces alongside .gitattributes: strip CR so a working copy that
+# was checked out with CRLF (Windows default) still produces a runnable
+# entrypoint instead of "no such file or directory" on its shebang.
+RUN sed -i 's/\r$//' ./scripts/docker-entrypoint.sh && chmod +x ./scripts/docker-entrypoint.sh
 ENTRYPOINT ["./scripts/docker-entrypoint.sh"]

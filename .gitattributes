@@ -1,0 +1,20 @@
+# Normalize text files in the repository to LF.
+#
+# Critical for shell scripts: git's Windows autocrlf would otherwise check
+# scripts/docker-entrypoint.sh out with CRLF, and the Linux container then
+# fails with "exec ./scripts/docker-entrypoint.sh: no such file or directory"
+# because the shebang resolves to "/bin/sh\r". Anything that runs inside a
+# container or a POSIX shell must stay LF on every platform.
+* text=auto eol=lf
+
+*.sh text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
+
+# Binary assets git must never touch.
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.db binary
