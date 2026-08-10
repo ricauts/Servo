@@ -6,8 +6,15 @@ services:
     environment:
       DATABASE_URL: "file:/data/servo.db"
       OPS_DATABASE_URL: "file:/data/ops.db"
+      # Production checklist (see SECURITY.md):
+      # AUTH_SECRET: "any-long-random-string"            # session signing
+      # SERVO_ENCRYPTION_KEY: "64-hex-or-passphrase"     # secrets encrypted at rest
+      # APP_URL: "https://servo.company.com"             # links in notifications
       # Bring your own key (optional — without it Servo runs in mock mode):
       # ANTHROPIC_API_KEY: "sk-ant-..."
+      # First boot only: load the fictional showcase dataset instead of a
+      # clean install (never combine with real use):
+      # SERVO_DEMO: "1"
     volumes:
       - servo-data:/data
     restart: unless-stopped

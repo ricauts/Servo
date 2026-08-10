@@ -5,8 +5,10 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-# Install dependencies first for better layer caching.
-COPY package.json package-lock.json ./
+# Install dependencies first for better layer caching. .npmrc must ride
+# along: it relaxes peer resolution (next-auth beta vs nodemailer 9), and
+# without it npm ci fails inside the image.
+COPY package.json package-lock.json .npmrc ./
 COPY prisma ./prisma
 RUN npm ci --no-audit --no-fund && npx prisma generate
 

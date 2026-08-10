@@ -6,15 +6,15 @@
 
 [![CI](https://github.com/ricauts/servo/actions/workflows/ci.yml/badge.svg)](https://github.com/ricauts/servo/actions/workflows/ci.yml)
 
-**An open-source, self-hostable AI-powered service desk.** Tickets can be assigned to humans *or* AI agents. AI agents triage incoming tickets, resolve them using real tools (SQL against a sandboxed ops database, device inventory lookups, simulated GitHub and cloud integrations), pause for **human approval** before risky actions, get an automated **QA review** afterwards, and everything feeds a **KPI dashboard**.
+**An open-source, self-hostable AI-powered service desk.** Email becomes tickets; AI agents triage them, draft every reply and work requests with real tools (SQL, device inventory, **real GitHub repos/branches/PRs, live Azure queries**), pause for **human approval** before anything risky, get an automated **QA review** afterwards — and everything feeds a **KPI dashboard**, including how many AI replies ship untouched.
 
 <p align="center">
   <img src="docs/assets/screenshot-dashboard.png" alt="Servo KPI dashboard" width="100%" />
 </p>
 
-Bring your own Anthropic API key for real model calls — or run entirely offline with the built-in deterministic mock provider (the default). The whole demo works without a key, a network connection, or an account anywhere.
+Bring your own model — Anthropic, Z.AI GLM, or any OpenAI-compatible endpoint — or evaluate entirely offline with the built-in deterministic mock provider. Self-host it with real SSO (any OIDC IdP), per-requester data isolation, secrets encrypted at rest, and a first-run wizard that takes a clean install to a working desk in one screen.
 
-> **Status: proof of concept.** Servo is a POC built to demonstrate an agentic service-desk architecture. It is not hardened for production use — see the [security disclaimer](#security-disclaimer) below.
+> **Status: production-ready for self-hosting.** Fresh installs start clean (no demo data), sign in through your identity provider, and store secrets encrypted. Follow the [production checklist](#production-checklist) and read [SECURITY.md](SECURITY.md) before exposing an install to real users.
 
 ## Features
 
@@ -23,7 +23,7 @@ Bring your own Anthropic API key for real model calls — or run entirely offlin
 - **Tool-using resolver** — the AI resolver operates a registry of 11 built-in tools plus any custom ones you define: read-only and mutating SQL against a sandboxed ops database, device inventory lookups, password resets, GitHub repo/PR operations, Azure resource listing, and cloud deployment plan/apply.
 - **Human-approval gates** — each tool carries a risk level (LOW/MEDIUM/HIGH) and an editable *requires approval* policy. When the agent reaches a gated tool, the run pauses, an approval lands in the Approvals inbox, and the run resumes exactly where it left off after a decision. Rejections flow back to the agent, which adapts instead of retrying.
 - **Automated QA review** — after a run that executed medium/high-risk tools, a QA agent reviews the transcript and issues a PASS/FAIL verdict; failures reassign the ticket to a human with an explanatory comment.
-- **KPI dashboard** — open tickets, resolution times, first-response times, AI-vs-human resolution split, approval stats, ticket volume over 30 days.
+- **KPI dashboard** — open tickets, resolution times, first-response times, AI-vs-human resolution split, approval stats, ticket volume over 30 days, and **AI reply acceptance** (sent as-is vs edited vs discarded) so you can see exactly how much typing the AI is saving.
 - **BYOK with offline mock mode** — plug in an Anthropic API key via Settings or environment variable, or run fully offline with the deterministic mock provider.
 - **API key pool with per-agent assignment and throughput metering** — register multiple named credentials (any provider mix), assign one per specialized agent from the Agents page, and every model call is logged (tokens in/out, latency, key, agent). A throughput panel on Agents aggregates the last 7 days per key and agent.
 - **SLA targets with automatic escalation** — per-priority response and resolution targets (editable in Settings). Every ticket carries live SLA state on the queue and detail views, the dashboard tracks breaches, and a scan escalates missed targets one tier up the group hierarchy — assigning the least-loaded eligible member and logging why. Schedule `POST /api/sla/scan` to run it unattended.
@@ -38,19 +38,21 @@ Bring your own Anthropic API key for real model calls — or run entirely offlin
 - **Custom tools & integrations** — admins define new HTTP tools from Settings (method, URL, headers, body template with `{input.field}` placeholders, and a stored secret injected via `{secret}`). They join the resolver's registry like built-in tools, with the same risk levels and human-approval gates — the fastest path to integrating a webhook, an internal API, or a SaaS endpoint.
 - **Specialized agents as `.md` files** — resolver personas (Analytics, Developer, Cybersecurity…) are Markdown documents with YAML frontmatter (`name`, `categories`, `tools`) and a system-prompt body. Drop files into `agents/` or create/edit them from the UI; the resolver automatically uses the enabled specialist covering the ticket's category. A **visual tool picker** per agent (checkboxes with each tool's risk and approval policy) narrows what it may call — no YAML editing — while core tools stay always-on and the .md frontmatter is rewritten to match.
 - **Role-based permissions** — ADMIN, AGENT, and REQUESTER roles with a permission matrix; HIGH-risk approvals and group management are admin-only.
-- **Demo user switcher** — hop between seeded users to experience every role without an auth provider.
+- **Offline evaluation mode** — without an OIDC tenant Servo runs a demo user switcher, so you can experience every role (and the whole agent loop, on the mock provider) with no auth provider, no API key and no network.
 - **shadcn/ui frontend** — Tailwind v4 + [shadcn/ui](https://ui.shadcn.com) components and charts (Recharts), themed with Servo's green-accent OKLCH palette; light mode by default with a dark-mode toggle.
 - **Docker-ready** — one `docker compose up --build` gives you a self-contained instance with persistent SQLite volumes.
 
 ## Screenshots
 
-| Agent run with human approval + QA | Approvals inbox |
-|---|---|
-| ![Ticket detail with an agent run, approval and QA verdict](docs/assets/screenshot-ticket-detail.png) | ![Approvals queue](docs/assets/screenshot-approvals.png) |
+All captures below are the real thing — live model replies (Z.AI GLM), a repository actually created on GitHub by the resolver, and the human-approval queues in action.
 
-| Ticket queue | Settings — BYOK & tool permissions |
+| A real agent run — repo created on GitHub, QA-reviewed | Approvals — tool sign-offs + AI reply drafts |
 |---|---|
-| ![Tickets list](docs/assets/screenshot-tickets.png) | ![Settings](docs/assets/screenshot-settings.png) |
+| ![Ticket detail with a real agent run that created a GitHub repository](docs/assets/screenshot-ticket-detail.png) | ![Approvals queue with pending tool approvals and AI reply drafts](docs/assets/screenshot-approvals.png) |
+
+| Integrations — SSO, mail, GitHub, MCP connected | Ticket queue |
+|---|---|
+| ![Integrations page with live connection status](docs/assets/screenshot-integrations.png) | ![Tickets list](docs/assets/screenshot-tickets.png) |
 
 <p align="center">
   <img src="docs/assets/screenshot-mobile.png" alt="Servo on mobile" width="300" /><br/>
@@ -146,7 +148,7 @@ The seed creates these users, switchable from the user switcher in the sidebar:
 3. **Approval pause** — when a tool policy says *requires approval*, the run stops, its full conversation is persisted, and an approval request appears in the Approvals inbox and on the ticket. On approval the tool executes and the loop continues from the exact same conversation state; on rejection the agent receives the rejection as an error result and wraps up gracefully.
 4. **QA** — if the run executed medium/high-risk tools and QA is enabled, a reviewer agent audits the transcript. A FAIL verdict reassigns the ticket to a human agent with a system comment.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full engine design, [docs/DEMO.md](docs/DEMO.md) for a 5-minute guided tour, and [docs/DESIGN.md](docs/DESIGN.md) for the color system (WCAG-audited light/dark tokens).
+See [docs/USER-GUIDE.md](docs/USER-GUIDE.md) for the day-to-day usage guide (setup, integrations, the AI reply loop, approvals, troubleshooting), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full engine design, [docs/DEMO.md](docs/DEMO.md) for a 5-minute guided tour, and [docs/DESIGN.md](docs/DESIGN.md) for the color system (WCAG-audited light/dark tokens).
 
 ## Project structure
 
@@ -186,15 +188,14 @@ docs/
 - SSO and real RBAC (the current roles/permissions are a demo matrix)
 - Email/Slack notifications
 
-## Security disclaimer
+## Security
 
-Servo is a **proof of concept**. Known shortcuts you should not carry into production:
+The full model lives in [SECURITY.md](SECURITY.md). The short version:
 
-- Authentication is a demo cookie-based user switcher — anyone can be anyone.
-- API keys saved via Settings are stored unencrypted in SQLite.
-- The agent's SQL tools run against a *sandboxed* local ops database, but the mutating SQL tool executes model-generated statements (behind the approval gate) — treat that pattern with care in any real deployment.
-- Custom HTTP tools make requests from the server to admin-defined URLs. There is no egress allowlist, so an admin can point them at internal networks (SSRF by design) — restrict who is an admin and add an allowlist before production use. Tool secrets are stored unencrypted in SQLite.
-- No rate limiting, audit log hardening, CSRF protection, or input sanitization beyond basic validation.
+- **Real sign-in** via any OIDC IdP, with a server-side domain allowlist; requesters only ever see their own tickets. Demo mode (the user switcher) exists for offline evaluation only — never expose it to a network you don't trust.
+- **Secrets are encrypted at rest** (AES-256-GCM via `SERVO_ENCRYPTION_KEY`) and never returned by any API.
+- **Risky agent actions sit behind human-approval gates**, read-only SQL is enforced at the driver, and unmet objectives escalate to a human instead of being marked resolved.
+- Honest residuals: custom HTTP tools are SSRF-by-design for admins (restrict who is an admin; egress allowlist is on the roadmap), and there is no built-in rate limiting yet — front a public install with a proxy/WAF.
 
 ## License
 
