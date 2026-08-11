@@ -9,11 +9,6 @@
 **An open-source, self-hostable AI-powered service desk.** Email becomes tickets; AI agents triage them, draft every reply and work requests with real tools (SQL, device inventory, **real GitHub repos/branches/PRs, live Azure queries**), pause for **human approval** before anything risky, get an automated **QA review** afterwards — and everything feeds a **KPI dashboard**, including how many AI replies ship untouched.
 
 <p align="center">
-  <img src="docs/assets/demo.gif" alt="A support email becomes a ticket; the agent attaches before/after screenshots, diagnoses the CSS, commits behind a human approval and merges — deploying the fix to the live site" width="100%" /><br/>
-  <em>A real run, recorded live: a support email about an unreadable button becomes a diagnosed CSS fix with before/after screenshots — and Servo <strong>waits for a human</strong> before committing and before merging, which deploys it.</em>
-</p>
-
-<p align="center">
   <img src="docs/assets/screenshot-dashboard.png" alt="Servo KPI dashboard" width="100%" />
 </p>
 
@@ -50,17 +45,35 @@ Bring your own model — Anthropic, Z.AI GLM, or any OpenAI-compatible endpoint 
 - **shadcn/ui frontend** — Tailwind v4 + [shadcn/ui](https://ui.shadcn.com) components and charts (Recharts), themed with Servo's green-accent OKLCH palette; light mode by default with a dark-mode toggle.
 - **Docker-ready** — one `docker compose up --build` gives you a self-contained instance with persistent SQLite volumes.
 
+## A real ticket, end to end
+
+Someone emailed the desk to say a button on our own landing page was unreadable. Servo triaged it, the frontend specialist read the source, diagnosed the CSS, and **captured what it looked like before and after its fix — from the branch, before anything was merged** — so a human could approve on evidence rather than on a diff:
+
+<p align="center">
+  <img src="docs/assets/before-after-fix.png" alt="Before: the Star on GitHub button label is unreadable at 2.4:1 contrast. After: the agent's fix restores the intended dark label at 9.4:1, passing WCAG AA" width="100%" />
+</p>
+
+Both screenshots land on the ticket, next to the AI-drafted reply waiting for review. The run itself folds into one line — agent, outcome, QA verdict, the tools it used and who approved what — and unfolds to the full step-by-step trace:
+
+<p align="center">
+  <img src="docs/assets/screenshot-ticket-detail.png" alt="The ticket showing the agent's before/after screenshots, the AI reply draft awaiting approval, and the folded run summary" width="100%" />
+</p>
+
+The commit and the merge each stopped for a human. Approvals — tool sign-offs and reply drafts — share one queue:
+
+<p align="center">
+  <img src="docs/assets/screenshot-approvals.png" alt="Approvals queue showing pending tool approvals with their exact input, and AI reply drafts awaiting review" width="100%" />
+</p>
+
 ## Screenshots
 
-All captures below are the real thing — live model replies (Z.AI GLM), a repository actually created on GitHub by the resolver, and the human-approval queues in action.
-
-| A real agent run — repo created on GitHub, QA-reviewed | Approvals — tool sign-offs + AI reply drafts |
+| Integrations — SSO, mail, GitHub, MCP connected | Specialized agents, their tools and throughput |
 |---|---|
-| ![Ticket detail with a real agent run that created a GitHub repository](docs/assets/screenshot-ticket-detail.png) | ![Approvals queue with pending tool approvals and AI reply drafts](docs/assets/screenshot-approvals.png) |
+| ![Integrations page with live connection status](docs/assets/screenshot-integrations.png) | ![Agents page with per-agent tools, API keys and token throughput](docs/assets/screenshot-agents.png) |
 
-| Integrations — SSO, mail, GitHub, MCP connected | Ticket queue |
+| Ticket queue | Settings — BYOK & tool permissions |
 |---|---|
-| ![Integrations page with live connection status](docs/assets/screenshot-integrations.png) | ![Tickets list](docs/assets/screenshot-tickets.png) |
+| ![Tickets list](docs/assets/screenshot-tickets.png) | ![Settings](docs/assets/screenshot-settings.png) |
 
 <p align="center">
   <img src="docs/assets/screenshot-mobile.png" alt="Servo on mobile" width="300" /><br/>

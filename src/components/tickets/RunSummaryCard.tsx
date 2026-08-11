@@ -7,6 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import Badge from "@/components/legacy/Badge";
+import { toPlainText } from "@/components/tickets/Markdown";
 import RelativeTime from "@/components/tickets/RelativeTime";
 import { RUN_STATUS_LABEL, RUN_STATUS_TONE } from "@/lib/labels";
 import type { RunStatus } from "@/lib/types";
@@ -43,8 +44,10 @@ export default function RunSummaryCard({
         </p>
 
         {run.summary && (
+          // Plain text on purpose: this rail is a three-line preview, and
+          // markdown syntax would read as noise at this size.
           <p className="line-clamp-3 text-xs text-muted-foreground">
-            {run.summary}
+            {toPlainText(run.summary)}
           </p>
         )}
 
