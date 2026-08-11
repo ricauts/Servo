@@ -47,6 +47,12 @@ export const ticketDetailInclude = {
     include: { decider: true },
     orderBy: { requestedAt: "asc" },
   },
+  // Metadata only — the bytes are served by /api/attachments/[id], so a
+  // ticket payload never carries screenshots inline.
+  attachments: {
+    select: { id: true, name: true, caption: true, createdAt: true },
+    orderBy: { createdAt: "asc" },
+  },
 } as const;
 
 /** Next sequential ticket number: (max number) + 1. */
