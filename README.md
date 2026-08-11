@@ -9,6 +9,11 @@
 **An open-source, self-hostable AI-powered service desk.** Email becomes tickets; AI agents triage them, draft every reply and work requests with real tools (SQL, device inventory, **real GitHub repos/branches/PRs, live Azure queries**), pause for **human approval** before anything risky, get an automated **QA review** afterwards — and everything feeds a **KPI dashboard**, including how many AI replies ship untouched.
 
 <p align="center">
+  <img src="docs/assets/demo-loop.gif" alt="An email becomes a ticket, the AI drafts the reply, a human edits and approves it, and the answer is sent" width="100%" /><br/>
+  <em>The whole loop: an email arrives → the AI drafts the reply → a human edits and approves → it ships. Real app, real model.</em>
+</p>
+
+<p align="center">
   <img src="docs/assets/screenshot-dashboard.png" alt="Servo KPI dashboard" width="100%" />
 </p>
 
