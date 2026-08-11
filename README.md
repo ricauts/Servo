@@ -9,13 +9,8 @@
 **An open-source, self-hostable AI-powered service desk.** Email becomes tickets; AI agents triage them, draft every reply and work requests with real tools (SQL, device inventory, **real GitHub repos/branches/PRs, live Azure queries**), pause for **human approval** before anything risky, get an automated **QA review** afterwards — and everything feeds a **KPI dashboard**, including how many AI replies ship untouched.
 
 <p align="center">
-  <img src="docs/assets/demo-loop.gif" alt="The AI resolver queries the ops database, pauses for human approval before a schema change, resumes once approved, and resolves the ticket with a QA pass" width="100%" /><br/>
-  <em>A real agent run, recorded live: the AI inspects the schema and answers with real SQL, then <strong>stops</strong> and asks a human before creating the table. Approve → it executes, verifies, resolves, and QA signs off.</em>
-</p>
-
-<p align="center">
-  <img src="docs/assets/demo-ship.gif" alt="A ticket asks for a UI fix; the agent screenshots the problem, diagnoses the CSS, commits to a branch behind approval, opens a PR, and merges it once a human approves — deploying the fix" width="100%" /><br/>
-  <em>And the same loop shipping code: the agent diagnoses a CSS bug, attaches before/after screenshots, and waits for a human at every write — commit, then merge, which deploys.</em>
+  <img src="docs/assets/demo.gif" alt="A support email becomes a ticket; the agent attaches before/after screenshots, diagnoses the CSS, commits behind a human approval and merges — deploying the fix to the live site" width="100%" /><br/>
+  <em>A real run, recorded live: a support email about an unreadable button becomes a diagnosed CSS fix with before/after screenshots — and Servo <strong>waits for a human</strong> before committing and before merging, which deploys it.</em>
 </p>
 
 <p align="center">
@@ -30,7 +25,8 @@ Bring your own model — Anthropic, Z.AI GLM, or any OpenAI-compatible endpoint 
 
 - **Tickets for humans and AI** — assign any ticket to a human agent or to the AI resolver; the resolver works the ticket end to end.
 - **Automatic triage** — new tickets are categorized, prioritized, and routed by an AI triage agent (toggleable in Settings).
-- **Tool-using resolver** — the AI resolver operates a registry of 11 built-in tools plus any custom ones you define: read-only and mutating SQL against a sandboxed ops database, device inventory lookups, password resets, GitHub repo/PR operations, Azure resource listing, and cloud deployment plan/apply.
+- **Tool-using resolver** — the AI resolver operates a registry of built-in tools plus any custom ones you define: read-only and mutating SQL against a sandboxed ops database, device inventory lookups, password resets, GitHub read/commit/PR/merge operations, page screenshots, Azure resource listing, and cloud deployment plan/apply.
+- **Readable audit trail** — a run is one entry in the ticket story: who acted, the outcome, the tools it used and who approved what. Unfold it and every step is there verbatim — folded by default so a ticket reads like a conversation, never truncated.
 - **Human-approval gates** — each tool carries a risk level (LOW/MEDIUM/HIGH) and an editable *requires approval* policy. When the agent reaches a gated tool, the run pauses, an approval lands in the Approvals inbox, and the run resumes exactly where it left off after a decision. Rejections flow back to the agent, which adapts instead of retrying.
 - **Automated QA review** — after a run that executed medium/high-risk tools, a QA agent reviews the transcript and issues a PASS/FAIL verdict; failures reassign the ticket to a human with an explanatory comment.
 - **KPI dashboard** — open tickets, resolution times, first-response times, AI-vs-human resolution split, approval stats, ticket volume over 30 days, and **AI reply acceptance** (sent as-is vs edited vs discarded) so you can see exactly how much typing the AI is saving.

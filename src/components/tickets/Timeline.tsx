@@ -23,6 +23,7 @@ import Avatar from "@/components/legacy/Avatar";
 import Badge from "@/components/legacy/Badge";
 import JsonBlock from "@/components/tickets/JsonBlock";
 import RelativeTime from "@/components/tickets/RelativeTime";
+import RunGroup from "@/components/tickets/RunGroup";
 import {
   APPROVAL_STATUS_TONE,
   RISK_LABEL,
@@ -35,12 +36,38 @@ type ApprovalWithDecider = Approval & { decider: User | null };
 type RunWithSteps = AgentRun & {
   steps: AgentStep[];
   approvals: ApprovalWithDecider[];
+  profile?: { name: string } | null;
 };
 
 type TimelineItem =
   | { key: string; at: Date; kind: "description" }
   | { key: string; at: Date; kind: "comment"; comment: CommentWithAuthor }
-  | { key: string; at: Date; kind: "step"; step: AgentStep; run: RunWithSteps };
+  | { key: string; at: Date; kind: "run"; run: RunWithSteps };
+
+/**
+ * A tool call and the result it produced read as one event, not two. Pairing
+ * them halves the length of a trace without dropping anything.
+ */
+type TracePart =
+  | { key: string; kind: "step"; step: AgentStep }
+  | { key: string; kind: "call"; call: AgentStep; result: AgentStep | null };
+
+function traceParts(steps: AgentStep[]): TracePart[] {
+  const parts: TracePart[] = [];
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    if (step.type === "TOOL_CALL") {
+      const next = steps[i + 1];
+      const result =
+        next && next.type === "TOOL_RESULT" && next.toolName === step.toolName ? next : null;
+      if (result) i++;
+      parts.push({ key: step.id, kind: "call", call: step, result });
+    } else {
+      parts.push({ key: step.id, kind: "step", step });
+    }
+  }
+  return parts;
+}
 
 function When({ at }: { at: Date }) {
   return (
@@ -78,17 +105,18 @@ export default function Timeline({
         comment,
       }),
     ),
-    ...runs.flatMap((run) =>
-      run.steps.map(
-        (step): TimelineItem => ({
-          key: `step-${step.id}`,
-          at: step.createdAt,
-          kind: "step",
-          step,
+    // One entry per run rather than one per step: 40 steps of trace collapse
+    // into a headline the reader can scan, expandable in place.
+    ...runs
+      .filter((run) => run.steps.length > 0)
+      .map(
+        (run): TimelineItem => ({
+          key: `run-${run.id}`,
+          at: run.createdAt,
+          kind: "run",
           run,
         }),
       ),
-    ),
   ];
   // Stable sort keeps step order intact when timestamps collide.
   items.sort((a, b) => a.at.getTime() - b.at.getTime());
@@ -170,43 +198,16 @@ function Marker({
     );
   }
 
-  const { step, run } = item;
-  switch (step.type) {
-    case "TEXT": {
-      const agent = agents[run.agentUserId];
-      return agent ? (
-        <Avatar name={agent.name} color={agent.color} size={28} isAi />
-      ) : (
-        <IconDot className="border-border bg-muted text-muted-foreground">
-          <Terminal size={14} strokeWidth={1.8} />
-        </IconDot>
-      );
-    }
-    case "APPROVAL_REQUEST":
-      return (
-        <IconDot className="border-warn/50 bg-warn-soft text-warn">
-          <ShieldAlert size={14} strokeWidth={1.8} />
-        </IconDot>
-      );
-    case "QA_REVIEW":
-      return (
-        <IconDot className="border-violet/40 bg-violet-soft text-violet">
-          <ClipboardCheck size={14} strokeWidth={1.8} />
-        </IconDot>
-      );
-    case "ERROR":
-      return (
-        <IconDot className="border-critical/40 bg-critical-soft text-critical">
-          <AlertTriangle size={14} strokeWidth={1.8} />
-        </IconDot>
-      );
-    default:
-      return (
-        <IconDot className="border-border bg-muted text-muted-foreground">
-          <Terminal size={14} strokeWidth={1.8} />
-        </IconDot>
-      );
-  }
+  // A run: the agent's own avatar, so the stream still reads as a
+  // conversation between people and agents.
+  const agent = agents[item.run.agentUserId];
+  return agent ? (
+    <Avatar name={agent.name} color={agent.color} size={28} isAi />
+  ) : (
+    <IconDot className="border-border bg-muted text-muted-foreground">
+      <Terminal size={14} strokeWidth={1.8} />
+    </IconDot>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -277,7 +278,64 @@ function ItemBody({
     );
   }
 
-  return <StepBody step={item.step} run={item.run} agents={agents} />;
+  const { run } = item;
+  const agentName = run.profile?.name ?? agents[run.agentUserId]?.name ?? "AI agent";
+  return (
+    <RunGroup
+      run={run}
+      agentName={agentName}
+      agentColor={agents[run.agentUserId]?.color ?? "#165A56"}
+    >
+      {traceParts(run.steps).map((part) =>
+        part.kind === "call" ? (
+          <ToolExchange
+            key={part.key}
+            call={part.call}
+            result={part.result}
+            agentName={agentName}
+          />
+        ) : (
+          <StepBody key={part.key} step={part.step} run={run} agents={agents} />
+        ),
+      )}
+    </RunGroup>
+  );
+}
+
+/** A tool call and its result, rendered as one exchange. */
+function ToolExchange({
+  call,
+  result,
+  agentName,
+}: {
+  call: AgentStep;
+  result: AgentStep | null;
+  agentName: string;
+}) {
+  const risk = call.riskLevel as RiskLevel | null;
+  const failed = result?.content.startsWith("Error:") || result?.content.includes("GitHub error");
+  return (
+    <div className="font-sans">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-muted-foreground/80">{agentName} called</span>
+        <ToolName>{call.toolName ?? "tool"}</ToolName>
+        {risk && <Badge tone={RISK_TONE[risk]}>{RISK_LABEL[risk]}</Badge>}
+        {failed && <Badge tone="critical">failed</Badge>}
+        <span className="text-xs text-muted-foreground/80">
+          · <When at={call.createdAt} />
+        </span>
+      </div>
+      <JsonBlock raw={call.content} className="mt-2 max-h-44" />
+      {result && (
+        <div className="mt-1.5 border-l-2 border-border pl-3">
+          <span className="font-mono text-[11px] uppercase tracking-wide text-muted-foreground/70">
+            returned
+          </span>
+          <JsonBlock raw={result.content} className="mt-1 max-h-40" />
+        </div>
+      )}
+    </div>
+  );
 }
 
 function StepBody({

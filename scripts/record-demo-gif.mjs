@@ -1,10 +1,10 @@
-// Records the README demo GIF: the AI resolver working a ticket with real
-// tools — running SQL against the ops database, pausing at a human-approval
-// gate, resuming after the human approves, and passing QA.
+// Records the README demo: a support request arrives by email, the AI agent
+// works it with real tools, a human approves the risky steps, and the change
+// ships to the live site.
 //
-// Frames are captured while the run is actually executing (the page is
-// re-rendered as steps land in the database), so the GIF is a recording of a
-// real agent run, not a mockup. Encoded with gifenc — no ffmpeg dependency.
+// Motion is captured, not implied: scrolling happens in small steps that are
+// each photographed, so playback glides instead of cutting between stills.
+// Encoded with gifenc — no ffmpeg dependency.
 //
 // Usage: node scripts/record-demo-gif.mjs <ticketUrl> [outfile]
 import { existsSync, writeFileSync } from "node:fs";
@@ -13,13 +13,11 @@ import sharp from "sharp";
 import gifenc from "gifenc"; // CJS module: named exports only via default
 const { GIFEncoder, quantize, applyPalette } = gifenc;
 
-const [ticketUrl, outfile = "docs/assets/demo-loop.gif"] = process.argv.slice(2);
+const [ticketUrl, outfile = "docs/assets/demo.gif"] = process.argv.slice(2);
 if (!ticketUrl) {
   console.error("Usage: node scripts/record-demo-gif.mjs <ticketUrl> [outfile]");
   process.exit(1);
 }
-const origin = new URL(ticketUrl).origin;
-const ticketId = ticketUrl.split("/tickets/")[1];
 
 const CHROME_PATHS = [
   "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
@@ -30,113 +28,85 @@ const CHROME_PATHS = [
 const executablePath = CHROME_PATHS.find((p) => existsSync(p));
 if (!executablePath) throw new Error("Chrome not found");
 
-// Capture at 2x and downscale: supersampling is what makes the text crisp.
-const VIEW = { width: 1180, height: 720 };
-const GIF_WIDTH = 1100;
-const FRAME_MS = 130;
+const VIEW = { width: 1220, height: 700 };
+const GIF_WIDTH = 880;
+const FRAME_MS = 90; // ~11fps: smooth enough to read as motion, cheap in bytes
 const frames = [];
 
 const browser = await puppeteer.launch({ executablePath, headless: "shell" });
 const page = await browser.newPage();
 await page.setViewport({ ...VIEW, deviceScaleFactor: 2 });
-
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+
 async function shoot(times = 1) {
   for (let i = 0; i < times; i++) frames.push(await page.screenshot({ type: "png" }));
 }
-async function clickText(text) {
-  const handle = await page.evaluateHandle(
-    (t) => [...document.querySelectorAll("button, a")].find((el) => el.textContent.trim() === t),
-    text,
-  );
-  const el = handle.asElement();
-  if (!el) throw new Error(`click target not found: ${text}`);
-  await el.click();
+/** Scroll to an absolute offset in steps, photographing the movement. */
+async function glideTo(targetY, steps = 9) {
+  const from = await page.evaluate(() => window.scrollY);
+  for (let i = 1; i <= steps; i++) {
+    // ease-in-out so the motion starts and stops softly
+    const t = i / steps;
+    const eased = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+    const y = Math.round(from + (targetY - from) * eased);
+    await page.evaluate((to) => window.scrollTo(0, to), y);
+    await shoot(1);
+  }
 }
-/** Keep the newest timeline activity in frame as the run grows. */
-async function followTimeline() {
-  await page.evaluate(() => {
-    const steps = document.querySelectorAll("[data-run-step], .font-mono, pre");
-    const last = steps[steps.length - 1];
-    if (last) last.scrollIntoView({ block: "center", behavior: "instant" });
-    else window.scrollTo({ top: document.body.scrollHeight, behavior: "instant" });
-  });
+async function offsetOf(text) {
+  return page.evaluate((t) => {
+    const el = [...document.querySelectorAll("h1,h2,h3,summary,figcaption,p,span,code")].find((n) =>
+      n.textContent?.trim().toLowerCase().includes(t.toLowerCase()),
+    );
+    if (!el) return null;
+    return window.scrollY + el.getBoundingClientRect().top - 120;
+  }, text);
 }
-async function runState() {
-  const res = await fetch(`${origin}/api/tickets/${ticketId}`);
-  const { ticket } = await res.json();
-  const run = ticket?.runs?.filter((r) => r.kind === "RESOLVE").at(-1);
-  return { status: run?.status ?? "none", steps: run?.steps?.length ?? 0, qa: run?.qaVerdict ?? null };
+async function glideToText(text, steps = 9) {
+  const y = await offsetOf(text);
+  if (y !== null) await glideTo(y, steps);
 }
 
-console.log("1/6 the request as it arrived…");
+console.log("1/6 the request, as it arrived by email…");
 await page.goto(ticketUrl, { waitUntil: "networkidle0", timeout: 45000 });
 await pause(1200);
-await shoot(12);
-
-console.log("2/6 handing it to the AI resolver…");
-await clickText("Run AI resolver");
-await pause(800);
-await shoot(4);
-
-console.log("3/6 recording the agent while it works…");
-let guard = 0;
-let state = await runState();
-while (state.status !== "WAITING_APPROVAL" && state.status !== "COMPLETED" && guard++ < 40) {
-  await pause(1800);
-  await page.reload({ waitUntil: "domcontentloaded", timeout: 45000 });
-  await pause(500);
-  await followTimeline();
-  await shoot(2);
-  state = await runState();
-  process.stdout.write(`   ${state.status} · ${state.steps} steps\r`);
-}
-console.log(`\n   -> ${state.status} after ${state.steps} steps`);
-
-if (state.status === "WAITING_APPROVAL") {
-  console.log("4/6 the run paused for human approval…");
-  await page.reload({ waitUntil: "networkidle0", timeout: 45000 });
-  await pause(900);
-  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
-  await pause(300);
-  await shoot(16); // hold: this is the whole point of the product
-
-  console.log("5/6 human approves…");
-  await clickText("Approve & resume");
-  await pause(900);
-  await shoot(4);
-
-  guard = 0;
-  while (state.status !== "COMPLETED" && guard++ < 40) {
-    await pause(1800);
-    await page.reload({ waitUntil: "domcontentloaded", timeout: 45000 });
-    await pause(500);
-    await followTimeline();
-    await shoot(2);
-    state = await runState();
-    process.stdout.write(`   ${state.status} · ${state.steps} steps\r`);
-  }
-  console.log(`\n   -> ${state.status}${state.qa ? ` · QA ${state.qa}` : ""}`);
-}
-
-console.log("6/6 resolved, with the full trace…");
-await page.reload({ waitUntil: "networkidle0", timeout: 45000 });
-await pause(1000);
-await followTimeline();
 await shoot(14);
-await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
-await pause(400);
-await shoot(12);
+
+console.log("2/6 what the agent saw — before and after…");
+await glideToText("Screenshots", 9);
+await shoot(20);
+
+console.log("3/6 the run, summarised…");
+await glideToText("github_read_file", 10);
+await shoot(18);
+
+console.log("4/6 unfolding the full trace…");
+await page.evaluate(() => {
+  const run = [...document.querySelectorAll("details")].find((d) =>
+    d.innerText.includes("github_edit_file"),
+  );
+  if (run) run.open = true;
+});
+await pause(500);
+await shoot(10);
+await glideToText("github_create_branch", 7);
+await shoot(8);
+
+console.log("5/6 the human decision…");
+await glideToText("Approval requested", 9);
+await shoot(22);
+
+console.log("6/6 shipped — the live site…");
+await page.goto("https://servoai.org/", { waitUntil: "networkidle0", timeout: 45000 });
+await pause(1500);
+await shoot(20);
 
 await browser.close();
 console.log(`captured ${frames.length} frames — encoding…`);
 
-// -- encode ------------------------------------------------------------------
-// Held beats are captured as repeated frames; merging them into one frame with
-// a longer delay keeps the pacing and cuts megabytes. The threshold is tight
-// enough that real UI changes stay their own frames.
+// Identical frames (deliberate holds) collapse into one frame with a longer
+// delay: same pacing, several megabytes cheaper.
 const SIMILAR = 0.0002;
-
 const raws = [];
 for (const png of frames) {
   raws.push(
@@ -164,7 +134,7 @@ console.log(`${frames.length} frames → ${merged.length} after merging holds`);
 
 const gif = GIFEncoder();
 for (const frame of merged) {
-  const palette = quantize(frame.data, 256, { format: "rgb565" });
+  const palette = quantize(frame.data, 128, { format: "rgb565" });
   const indexed = applyPalette(frame.data, palette, "rgb565");
   gif.writeFrame(indexed, frame.info.width, frame.info.height, { palette, delay: frame.delay });
 }
