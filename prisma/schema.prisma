@@ -74,10 +74,11 @@ model Ticket {
   resolutionDueAt DateTime?
   slaEscalatedAt  DateTime?
 
-  comments  Comment[]
-  runs      AgentRun[]
-  approvals Approval[]
-  drafts    ReplyDraft[]
+  comments    Comment[]
+  runs        AgentRun[]
+  approvals   Approval[]
+  drafts      ReplyDraft[]
+  attachments Attachment[]
 }
 
 // An AI-drafted reply to the requester awaiting a human decision — the daily
@@ -96,6 +97,21 @@ model ReplyDraft {
   decidedAt DateTime?
   deciderId String?
   decider   User?     @relation("draftDecider", fields: [deciderId], references: [id])
+}
+
+// A file produced while working a ticket — today, screenshots captured by the
+// agents so a human can SEE a proposed UI change before approving it. Stored
+// in the database on purpose: it survives container restarts on the same
+// volume and needs no filesystem configuration.
+model Attachment {
+  id          String   @id @default(cuid())
+  ticketId    String
+  ticket      Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  name        String
+  contentType String   @default("image/png")
+  data        Bytes
+  caption     String   @default("")
+  createdAt   DateTime @default(now())
 }
 
 model Comment {

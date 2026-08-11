@@ -89,6 +89,39 @@ export const DEFAULT_TOOL_POLICIES: DefaultToolPolicy[] = [
     requiresApproval: false,
   },
   {
+    toolName: "take_screenshot",
+    description:
+      "Render a web page in a real browser and attach the screenshot to the ticket for a human to review.",
+    riskLevel: "LOW",
+    requiresApproval: false,
+  },
+  {
+    toolName: "github_list_repos",
+    description: "List the GitHub repositories this install can reach (cached).",
+    riskLevel: "LOW",
+    requiresApproval: false,
+  },
+  {
+    toolName: "github_read_file",
+    description: "Read a file from a GitHub repository to inspect the code before changing it.",
+    riskLevel: "LOW",
+    requiresApproval: false,
+  },
+  {
+    toolName: "github_edit_file",
+    description:
+      "Commit a precise find/replace change to a file on a feature branch (real API when a token is configured).",
+    riskLevel: "HIGH",
+    requiresApproval: true,
+  },
+  {
+    toolName: "github_merge_pr",
+    description:
+      "Merge an open pull request into its base branch, shipping the change and triggering deployment.",
+    riskLevel: "HIGH",
+    requiresApproval: true,
+  },
+  {
     toolName: "escalate_to_human",
     description:
       "Hand the ticket to a human teammate when the main objective could not be completed.",

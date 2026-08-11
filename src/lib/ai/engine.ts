@@ -340,6 +340,66 @@ export async function runTriage(ticketId: string): Promise<AgentRun> {
 
 // -- resolver -----------------------------------------------------------------
 
+const BRIEFING_COMMENT_LIMIT = 12;
+const BRIEFING_BODY_CHARS = 600;
+
+/**
+ * What the resolver is told when a run starts. A ticket is rarely a blank
+ * slate by the time an agent picks it up: earlier runs may have already
+ * created branches or opened pull requests, and the conversation carries the
+ * human's decisions. Without this, a second run starts amnesiac and redoes
+ * work that already exists.
+ */
+async function resolverBriefing(ticket: TicketWithRequester): Promise<string> {
+  const [comments, priorRuns] = await Promise.all([
+    db.comment.findMany({
+      where: { ticketId: ticket.id },
+      include: { author: true },
+      orderBy: { createdAt: "desc" },
+      take: BRIEFING_COMMENT_LIMIT,
+    }),
+    db.agentRun.findMany({
+      where: { ticketId: ticket.id, kind: "RESOLVE", status: "COMPLETED" },
+      orderBy: { createdAt: "asc" },
+      select: { summary: true, createdAt: true },
+    }),
+  ]);
+
+  const parts = [
+    `Ticket #${ticket.number}: ${ticket.title}`,
+    "",
+    ticket.description,
+    "",
+    `Requester: ${ticket.requester.name} <${ticket.requester.email}>`,
+    `Status: ${ticket.status} · Priority: ${ticket.priority} · Category: ${ticket.category}`,
+  ];
+
+  if (priorRuns.length > 0) {
+    parts.push(
+      "",
+      "## Work already done on this ticket",
+      "Do NOT repeat it — build on it or finish what it left open.",
+      ...priorRuns.map((run, i) => `${i + 1}. ${run.summary ?? "(no summary recorded)"}`),
+    );
+  }
+
+  if (comments.length > 0) {
+    parts.push(
+      "",
+      "## Conversation so far (oldest last)",
+      ...comments.reverse().map((c) => {
+        const body =
+          c.body.length > BRIEFING_BODY_CHARS
+            ? `${c.body.slice(0, BRIEFING_BODY_CHARS)}…`
+            : c.body;
+        return `- **${c.author.name}**: ${body}`;
+      }),
+    );
+  }
+
+  return parts.join("\n");
+}
+
 // In-process guard closing the check-then-create race between the two entry
 // points (POST /runs and the PATCH assign side effect); the DB findFirst below
 // covers persisted state (e.g. WAITING_APPROVAL pauses) across restarts.
@@ -368,12 +428,7 @@ async function runResolverInner(ticketId: string): Promise<AgentRun> {
   const messages: ConversationMessage[] = [
     {
       role: "user",
-      content: [
-        {
-          type: "text",
-          text: `Ticket #${ticket.number}: ${ticket.title}\n\n${ticket.description}\n\nRequester: ${ticket.requester.name} <${ticket.requester.email}>`,
-        },
-      ],
+      content: [{ type: "text", text: await resolverBriefing(ticket) }],
     },
   ];
   // Pin the specialized profile (if any) on the run so resumes reuse it.

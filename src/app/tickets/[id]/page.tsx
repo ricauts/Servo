@@ -12,6 +12,7 @@ import SlaBadge from "@/components/tickets/SlaBadge";
 import PendingApprovalCard from "@/components/tickets/PendingApprovalCard";
 import PropertiesPanel from "@/components/tickets/PropertiesPanel";
 import ReplyDraftCard from "@/components/tickets/ReplyDraftCard";
+import AttachmentGallery from "@/components/tickets/AttachmentGallery";
 import { getSmtpConfig } from "@/lib/notify";
 import RelativeTime from "@/components/tickets/RelativeTime";
 import RunResolverCard from "@/components/tickets/RunResolverCard";
@@ -59,6 +60,10 @@ export default async function TicketDetailPage({
       approvals: {
         include: { decider: true },
         orderBy: { requestedAt: "asc" },
+      },
+      attachments: {
+        select: { id: true, caption: true, createdAt: true },
+        orderBy: { createdAt: "asc" },
       },
     },
   });
@@ -144,6 +149,8 @@ export default async function TicketDetailPage({
               requestedAt={pendingApproval.requestedAt}
             />
           )}
+
+          <AttachmentGallery attachments={ticket.attachments} />
 
           {canWorkTicket && (
             <ReplyDraftCard

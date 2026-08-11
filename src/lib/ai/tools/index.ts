@@ -9,6 +9,7 @@ import { githubTools } from "./github";
 import { identityTools } from "./identity";
 import { opsDbTools } from "./ops-db";
 import { ticketTools } from "./ticket";
+import { webTools } from "./web";
 
 export type { ToolContext, ToolDef } from "./types";
 
@@ -17,5 +18,6 @@ export const TOOLS = {
   ...identityTools,
   ...githubTools,
   ...cloudTools,
+  ...webTools,
   ...ticketTools,
 };

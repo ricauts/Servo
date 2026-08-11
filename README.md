@@ -14,6 +14,11 @@
 </p>
 
 <p align="center">
+  <img src="docs/assets/demo-ship.gif" alt="A ticket asks for a UI fix; the agent screenshots the problem, diagnoses the CSS, commits to a branch behind approval, opens a PR, and merges it once a human approves — deploying the fix" width="100%" /><br/>
+  <em>And the same loop shipping code: the agent diagnoses a CSS bug, attaches before/after screenshots, and waits for a human at every write — commit, then merge, which deploys.</em>
+</p>
+
+<p align="center">
   <img src="docs/assets/screenshot-dashboard.png" alt="Servo KPI dashboard" width="100%" />
 </p>
 
@@ -34,6 +39,8 @@ Bring your own model — Anthropic, Z.AI GLM, or any OpenAI-compatible endpoint 
 - **SLA targets with automatic escalation** — per-priority response and resolution targets (editable in Settings). Every ticket carries live SLA state on the queue and detail views, the dashboard tracks breaches, and a scan escalates missed targets one tier up the group hierarchy — assigning the least-loaded eligible member and logging why. Schedule `POST /api/sla/scan` to run it unattended.
 - **Groups & escalation hierarchy** — assignment groups (Development, Analytics, Engineering…) own ticket categories; members carry JUNIOR → MID → SENIOR tiers per group, or STANDALONE for specialists outside the ladder. Priority sets the minimum tier, and any agent can escalate a ticket up a tier or across to another group — the least-loaded eligible member picks it up and the move is logged on the timeline.
 - **Real Azure integration (read-only)** — a service principal with `Reader` is enough: `azure_list_resources` runs live Resource Manager queries (subscription-wide or scoped to a resource group), with a Test-connection button that acquires a token and lists resources. Mutating cloud actions stay simulated behind the approval gate.
+- **Ships code, gated by humans** — the GitHub tools go past "open an empty branch": `github_read_file` inspects the real source, **`github_edit_file`** commits a precise find/replace on a feature branch (the approval card shows the exact before/after, and an ambiguous match is refused rather than guessed), `github_open_pr` raises the PR and **`github_merge_pr`** lands it — which triggers whatever deployment workflow the repo already has. Both write steps require human approval.
+- **Screenshots for review** — `take_screenshot` renders a page in a real browser on the server and attaches the image to the ticket, so a reviewer *sees* a proposed UI change before approving it. It renders a raw branch file too, which means the "after" image exists before anything is merged. Needs a Chrome/Chromium on the host (`PUPPETEER_EXECUTABLE_PATH`); without one the tool says so instead of pretending.
 - **Real GitHub integration** — add a personal access token (env `GITHUB_TOKEN` or Settings, with a Test-token button) and `github_create_repo` / `github_create_branch` / `github_open_pr` hit the real GitHub API — still behind their risk levels and approval gates. A ticket like "implement feature X" becomes a real feature branch (and PR) created by the resolver. Without a token they stay simulated so the offline demo keeps working. A base-URL override supports GitHub Enterprise.
 - **Outbound webhooks** — stream `ticket.created/resolved/escalated` and `approval.pending/decided` to any endpoint as signed JSON (`x-servo-signature: sha256=HMAC(secret, body)`). Manage endpoints and subscriptions from Settings, send test pings, and watch a per-endpoint delivery log with latencies.
 - **Command palette (Ctrl/⌘ K)** — search tickets by number, title, or text and jump to any page from the keyboard, anywhere in the app.
