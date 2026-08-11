@@ -9,8 +9,8 @@
 **An open-source, self-hostable AI-powered service desk.** Email becomes tickets; AI agents triage them, draft every reply and work requests with real tools (SQL, device inventory, **real GitHub repos/branches/PRs, live Azure queries**), pause for **human approval** before anything risky, get an automated **QA review** afterwards — and everything feeds a **KPI dashboard**, including how many AI replies ship untouched.
 
 <p align="center">
-  <img src="docs/assets/demo-loop.gif" alt="An email becomes a ticket, the AI drafts the reply, a human edits and approves it, and the answer is sent" width="100%" /><br/>
-  <em>The whole loop: an email arrives → the AI drafts the reply → a human edits and approves → it ships. Real app, real model.</em>
+  <img src="docs/assets/demo-loop.gif" alt="The AI resolver queries the ops database, pauses for human approval before a schema change, resumes once approved, and resolves the ticket with a QA pass" width="100%" /><br/>
+  <em>A real agent run, recorded live: the AI inspects the schema and answers with real SQL, then <strong>stops</strong> and asks a human before creating the table. Approve → it executes, verifies, resolves, and QA signs off.</em>
 </p>
 
 <p align="center">
