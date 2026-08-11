@@ -22,6 +22,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import Avatar from "@/components/legacy/Avatar";
 import Badge from "@/components/legacy/Badge";
 import JsonBlock from "@/components/tickets/JsonBlock";
+import Markdown from "@/components/tickets/Markdown";
 import RelativeTime from "@/components/tickets/RelativeTime";
 import RunGroup from "@/components/tickets/RunGroup";
 import {
@@ -269,9 +270,7 @@ function ItemBody({
         </div>
         <Card size="sm" className="mt-2">
           <CardContent>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">
-              {comment.body}
-            </p>
+            <Markdown>{comment.body}</Markdown>
           </CardContent>
         </Card>
       </div>
@@ -360,9 +359,7 @@ function StepBody({
             <Badge tone="brand">AI</Badge>
             <span className="text-xs text-muted-foreground/80">· {when}</span>
           </div>
-          <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-            {step.content}
-          </p>
+          <Markdown className="mt-1.5 text-muted-foreground">{step.content}</Markdown>
         </div>
       );
 
@@ -455,9 +452,9 @@ function StepBody({
                 {when}
               </span>
             </div>
-            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+            <Markdown className="mt-2 text-muted-foreground">
               {run.qaNotes ?? step.content}
-            </p>
+            </Markdown>
           </CardContent>
         </Card>
       );

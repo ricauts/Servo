@@ -49,6 +49,7 @@ export const draftSystem = `You are Servo Drafter, writing the reply a support e
 
 Rules:
 - Write ONLY the reply body, ready to send by email: no subject line, no signature block, no placeholders like [name].
+- Plain prose only — this is sent as a plain-text email, so markdown (**bold**, \`code\`, bullets with *) would reach the requester as literal characters.
 - Reply in the requester's language (match the language of the ticket).
 - Be concrete and helpful: acknowledge the request, state what will be done or what is needed from the requester, and give the next step or ETA when reasonable.
 - If the request is missing information you need, ask for exactly the missing pieces as a short list.

@@ -6,9 +6,9 @@
 // open, because that is what the reader needs to act on.
 
 import type { AgentRun, AgentStep, Approval, User } from "@prisma/client";
-import { ChevronRight } from "lucide-react";
-import Avatar from "@/components/legacy/Avatar";
+import { ChevronRight, ClipboardCheck } from "lucide-react";
 import Badge from "@/components/legacy/Badge";
+import Markdown, { toPlainText } from "@/components/tickets/Markdown";
 import RelativeTime from "@/components/tickets/RelativeTime";
 
 export type RunWithSteps = AgentRun & {
@@ -97,23 +97,36 @@ export default function RunGroup({
           </span>
         </div>
 
+        {/* What the agent says it did. Clamped plain text while folded so the
+            header stays scannable; full markdown once opened. */}
         {run.summary && (
-          <p className="line-clamp-2 font-sans text-sm leading-relaxed text-muted-foreground group-open:line-clamp-none">
-            {run.summary}
-          </p>
+          <div className="font-sans text-sm leading-relaxed text-muted-foreground">
+            <p className="line-clamp-2 group-open:hidden">{toPlainText(run.summary)}</p>
+            <div className="hidden group-open:block">
+              <Markdown>{run.summary}</Markdown>
+            </div>
+          </div>
+        )}
+
+        {/* The QA verdict belongs with the outcome, not buried in the trace. */}
+        {run.qaVerdict && run.qaNotes && (
+          <div className="flex gap-2 rounded-md bg-muted/50 px-3 py-2 font-sans text-xs leading-relaxed text-muted-foreground">
+            <ClipboardCheck size={14} className="mt-0.5 shrink-0 text-violet" aria-hidden />
+            <div className="min-w-0">
+              <span className="font-heading font-semibold uppercase tracking-wide text-muted-foreground/80">
+                QA review
+              </span>{" "}
+              <span className="line-clamp-2 group-open:line-clamp-none">{run.qaNotes}</span>
+            </div>
+          </div>
         )}
 
         {(trail.length > 0 || decided.length > 0) && (
-          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 font-mono text-[11px] text-muted-foreground/90">
-            {trail.map((tool, i) => (
-              <span key={tool} className="whitespace-nowrap">
-                {i > 0 && <span className="mr-1.5 text-muted-foreground/50">·</span>}
-                {tool}
-              </span>
-            ))}
+          <div className="font-mono text-[11px] text-muted-foreground/90">
+            {trail.join("  ·  ")}
             {decided.map((a) => (
-              <span key={a.id} className="whitespace-nowrap">
-                <span className="mx-1.5 text-muted-foreground/50">·</span>
+              <span key={a.id}>
+                {"  ·  "}
                 <span className={a.status === "APPROVED" ? "text-good" : "text-critical"}>
                   {a.status === "APPROVED" ? "approved" : "rejected"}
                   {a.decider ? ` by ${a.decider.name.split(" ")[0]}` : ""}
