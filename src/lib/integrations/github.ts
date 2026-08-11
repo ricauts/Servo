@@ -255,6 +255,36 @@ export async function editFile(
   return `GitHub error ${result.status}: ${String(result.body.message ?? "commit failed")}`;
 }
 
+/**
+ * Files a branch changes relative to its base. Used to decide what is worth
+ * rendering for a visual review — no PR needed, so it can run before one
+ * is opened.
+ */
+export async function changedFiles(
+  config: GithubConfig,
+  input: { repo: string; base: string; head: string },
+): Promise<string[]> {
+  const owner = config.owner;
+  if (!owner) return [];
+  const result = await githubRequest(
+    config,
+    "GET",
+    `/repos/${owner}/${input.repo}/compare/${encodeURIComponent(input.base)}...${encodeURIComponent(input.head)}`,
+  );
+  if (result.status !== 200 || !Array.isArray(result.body.files)) return [];
+  return (result.body.files as Record<string, unknown>[])
+    .map((f) => String(f.filename ?? ""))
+    .filter(Boolean);
+}
+
+/** Raw file URL for a path on a branch — renderable by the screenshot tool. */
+export function rawFileUrl(
+  config: GithubConfig,
+  input: { repo: string; ref: string; path: string },
+): string {
+  return `https://raw.githubusercontent.com/${config.owner}/${input.repo}/${input.ref}/${input.path}`;
+}
+
 /** Merge an open pull request (squash by default). */
 export async function mergePr(
   config: GithubConfig,

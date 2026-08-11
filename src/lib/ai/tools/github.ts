@@ -11,6 +11,7 @@ import {
   openPr,
   readFile,
 } from "@/lib/integrations/github";
+import { capturePrPreview } from "@/lib/ai/pr-preview";
 import { errorMessage, str, type ToolDef } from "./types";
 
 export const githubTools: Record<string, ToolDef> = {
@@ -220,7 +221,7 @@ export const githubTools: Record<string, ToolDef> = {
   github_open_pr: {
     name: "github_open_pr",
     description:
-      "Open a pull request with proposed changes (real API when a token is configured in Settings; simulated otherwise).",
+      "Open a pull request with proposed changes. When the branch changes a page a browser can render, Servo automatically captures before/after screenshots and attaches them to the ticket so the approver can see the change — you do not need to request that separately. For an app that needs a build, pass previewUrl.",
     inputSchema: {
       type: "object",
       properties: {
@@ -229,10 +230,15 @@ export const githubTools: Record<string, ToolDef> = {
         description: { type: "string", description: "Optional pull request body." },
         head: { type: "string", description: "Source branch (default servo/proposed-changes)." },
         base: { type: "string", description: "Target branch (default main)." },
+        previewUrl: {
+          type: "string",
+          description:
+            "Optional deploy-preview URL to screenshot instead of the raw branch file (for apps that need a build).",
+        },
       },
       required: ["repo", "title"],
     },
-    async execute(input) {
+    async execute(input, ctx) {
       const repo = str(input.repo).trim();
       const title = str(input.title).trim();
       if (!repo || !title) return "Error: repo and title are required.";
@@ -240,14 +246,28 @@ export const githubTools: Record<string, ToolDef> = {
       if (!config.token) {
         return `[simulated — no GitHub token configured] Pull request opened: https://github.com/acme/${repo}/pull/42 — "${title}".`;
       }
+      const head = str(input.head) || "servo/proposed-changes";
+      const base = str(input.base) || "main";
       try {
-        return await openPr(config, {
+        // Visual evidence first, so the pull request body can point at it and
+        // the approver never has to imagine the result of a CSS diff.
+        const preview = await capturePrPreview(config, {
+          ticketId: ctx.ticketId,
+          repo,
+          base,
+          head,
+          previewUrl: str(input.previewUrl) || undefined,
+        });
+        const result = await openPr(config, {
           repo,
           title,
-          description: str(input.description),
-          head: str(input.head) || undefined,
-          base: str(input.base) || undefined,
+          description: `${str(input.description)}${preview.note}`,
+          head,
+          base,
         });
+        return preview.captured > 0
+          ? `${result} ${preview.captured} screenshot(s) of the change attached to the ticket for review.`
+          : result;
       } catch (err) {
         return `GitHub request failed: ${errorMessage(err)}`;
       }

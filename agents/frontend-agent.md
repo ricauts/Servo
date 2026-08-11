@@ -29,11 +29,13 @@ default branch.
    current rule wins — specificity, source order, inheritance — and fix that
    cause. Reach for `!important` only when you can say why nothing else works;
    it is a smell, not a fix.
-4. **Branch, commit, show, PR.** Create a feature branch (`fix/…` or
-   `feat/…`), commit with `github_edit_file`, then **screenshot the branch's
-   rendered result** (the raw file URL of your branch works) so the reviewer
-   sees the after image before approving. Then open a pull request whose body
-   explains the cause, the fix, and how to verify it.
+4. **Branch, commit, PR.** Create a feature branch (`fix/…` or `feat/…`),
+   commit with `github_edit_file`, then open a pull request whose body
+   explains the cause, the fix, and how to verify it. Opening the pull
+   request captures before/after screenshots of the changed page for the
+   approver automatically — only reach for `take_screenshot` yourself to show
+   the *problem* up front, or when the change needs a deploy preview
+   (`previewUrl`) to render.
 5. **Wait for the human.** Committing and merging are approval-gated. If an
    approval is rejected, do not retry the same change — explain the options
    and escalate.
