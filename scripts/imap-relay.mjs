@@ -41,6 +41,16 @@ async function forward(parsed) {
       from: parsed.from?.text ?? "",
       subject: parsed.subject ?? "",
       text: parsed.text ?? "",
+      // Servo uses these to recognise bounces and auto-replies, which must
+      // never become tickets (RFC 3834 and the de-facto headers).
+      headers: {
+        "auto-submitted": parsed.headers?.get("auto-submitted") ?? "",
+        precedence: parsed.headers?.get("precedence") ?? "",
+        "return-path": parsed.headers?.get("return-path") ?? "",
+        "content-type": String(parsed.headers?.get("content-type")?.value ?? ""),
+        "x-autoreply": parsed.headers?.get("x-autoreply") ?? "",
+        "x-auto-response-suppress": parsed.headers?.get("x-auto-response-suppress") ?? "",
+      },
     }),
     signal: AbortSignal.timeout(15_000),
   });

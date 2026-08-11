@@ -32,9 +32,9 @@ if (!executablePath) throw new Error("Chrome not found");
 
 const VIEW = { width: 1240, height: 700 };
 const SIDEBAR = 264; // cropped away: it never moves, and costs a fifth of every frame
-const GIF_WIDTH = 760;
-const FRAME_MS = 80;
-const SCROLL_PX = 36; // per frame — a comfortable reading speed
+const GIF_WIDTH = 720;
+const FRAME_MS = 90;
+const SCROLL_PX = 48; // per frame — a comfortable reading speed
 const frames = []; // { png } | { composed: Buffer }
 
 const browser = await puppeteer.launch({ executablePath, headless: "shell" });
@@ -130,12 +130,17 @@ if (before && after) {
   console.warn("   (no before/after attachments found — skipping the zoom)");
 }
 
-console.log("4/4 one continuous read-through to the end of the ticket…");
-const remaining = await page.evaluate(
-  () => document.body.scrollHeight - window.scrollY - window.innerHeight,
-);
-await scrollBySmoothly(Math.max(0, remaining));
-await shoot(22);
+console.log("4/4 one continuous read-through, ending on the outcome…");
+// Stop at the last thing worth seeing — the resolution comment — rather than
+// scrolling through the tail of the thread. Every frame of a scroll is a
+// distinct frame in the file, so the tail was pure weight.
+const endY =
+  (await offsetOf("Resolved by")) ??
+  (await offsetOf("QA review")) ??
+  (await page.evaluate(() => document.body.scrollHeight - window.innerHeight));
+const from = await page.evaluate(() => window.scrollY);
+await scrollBySmoothly(Math.max(0, endY - from));
+await shoot(24);
 
 await browser.close();
 console.log(`captured ${frames.length} frames — encoding…`);

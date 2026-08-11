@@ -89,6 +89,78 @@ export function stripQuotedReply(text: string): string {
   return kept || text.trim();
 }
 
+/**
+ * Mail that no human sent: bounces, delivery-status notifications, vacation
+ * auto-replies. These must never become tickets — they are noise, they would
+ * provision "Mail Delivery Subsystem" as a requester, and replying to them
+ * risks a mail loop.
+ *
+ * Header signals (RFC 3834 and the de-facto ones) are checked when the
+ * relay forwards them; the sender and subject heuristics work even for
+ * providers that only post from/subject/text.
+ */
+export function detectAutomatedMail(message: {
+  from: string;
+  subject?: string;
+  headers?: Record<string, string | undefined>;
+}): string | null {
+  const headers = message.headers ?? {};
+  const header = (name: string) => (headers[name] ?? "").toLowerCase();
+
+  const autoSubmitted = header("auto-submitted");
+  if (autoSubmitted && autoSubmitted !== "no") return `Auto-Submitted: ${autoSubmitted}`;
+  const precedence = header("precedence");
+  if (["bulk", "auto_reply", "junk", "list"].includes(precedence)) {
+    return `Precedence: ${precedence}`;
+  }
+  if (header("content-type").includes("report-type=delivery-status")) {
+    return "Delivery status report";
+  }
+  // An empty envelope sender (<>) is the RFC-mandated marker of a bounce.
+  const returnPath = header("return-path").replace(/\s/g, "");
+  if (returnPath === "<>") return "Empty return path (bounce)";
+  if (header("x-autoreply") || header("x-autorespond") || header("x-auto-response-suppress")) {
+    return "Auto-responder header";
+  }
+
+  const local = (parseSenderEmail(message.from).split("@")[0] ?? "").toLowerCase();
+  if (
+    ["mailer-daemon", "postmaster", "no-reply", "noreply", "donotreply", "do-not-reply", "bounce", "bounces"].includes(
+      local,
+    )
+  ) {
+    return `Automated sender (${local})`;
+  }
+
+  const subject = (message.subject ?? "").toLowerCase();
+  if (
+    /delivery status notification|undeliverable|mail delivery (failed|subsystem)|returned mail|delivery has failed|out of office|automatic reply|auto[- ]?reply|autoresponse/.test(
+      subject,
+    )
+  ) {
+    return "Automated subject line";
+  }
+  return null;
+}
+
+/**
+ * The address a bounce is reporting on, so the failure can be attached to the
+ * conversation it belongs to instead of vanishing.
+ */
+export function extractFailedRecipient(body: string): string {
+  const patterns = [
+    /final-recipient:\s*rfc822;\s*([^\s<>]+@[^\s<>]+)/i,
+    /original-recipient:\s*rfc822;\s*([^\s<>]+@[^\s<>]+)/i,
+    /(?:wasn't|was not|couldn't be|could not be) delivered to\s*\**\s*([^\s<>*]+@[^\s<>*]+)/i,
+    /<([^\s<>]+@[^\s<>]+)>:?\s*(?:host|recipient|address)/i,
+  ];
+  for (const pattern of patterns) {
+    const match = body.match(pattern);
+    if (match?.[1]) return match[1].replace(/[.,;]+$/, "").toLowerCase();
+  }
+  return "";
+}
+
 const REQUESTER_COLORS = ["#4A3AA7", "#1C5CAB", "#B4491F", "#8F6400", "#0A6E66"];
 
 /** Existing user for this address, or a freshly created REQUESTER. */
@@ -110,11 +182,14 @@ export interface InboundMessage {
   from: string;
   subject: string;
   text: string;
+  /** Raw mail headers when the relay/provider forwards them. */
+  headers?: Record<string, string | undefined>;
 }
 
 export type InboundResult =
   | { action: "comment"; ticketId: string; ticketNumber: number }
   | { action: "created"; ticketId: string; ticketNumber: number }
+  | { action: "bounce"; ticketId: string; ticketNumber: number; recipient: string }
   | { action: "ignored"; reason: string };
 
 /**
@@ -141,6 +216,40 @@ export async function ingestEmail(message: InboundMessage): Promise<InboundResul
   }
   if (own.has(email)) {
     return { action: "ignored", reason: "Own notification address." };
+  }
+
+  // Bounces and auto-replies are not tickets. But a bounce carries something
+  // a human needs to know — a reply never reached the requester — so it is
+  // attached to that requester's ticket instead of being dropped silently.
+  const automated = detectAutomatedMail(message);
+  if (automated) {
+    const recipient = extractFailedRecipient(message.text ?? "");
+    if (recipient) {
+      const ticket = await db.ticket.findFirst({
+        where: { requester: { email: recipient }, status: { not: "CLOSED" } },
+        orderBy: { updatedAt: "desc" },
+      });
+      if (ticket) {
+        const reporter = await db.user.findFirst({
+          where: { role: "AI_AGENT", aiKind: "TRIAGE" },
+        });
+        await db.comment.create({
+          data: {
+            ticketId: ticket.id,
+            authorId: (reporter ?? (await db.user.findFirstOrThrow({ where: { role: "ADMIN" } }))).id,
+            kind: "SYSTEM",
+            body: `Delivery failed: mail to ${recipient} bounced (${(message.subject ?? "").trim() || automated}). The requester has not received the last reply.`,
+          },
+        });
+        return {
+          action: "bounce",
+          ticketId: ticket.id,
+          ticketNumber: ticket.number,
+          recipient,
+        };
+      }
+    }
+    return { action: "ignored", reason: `Automated mail — ${automated}.` };
   }
 
   const body = stripQuotedReply(message.text ?? "");

@@ -67,7 +67,13 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "Missing sender address." }, { status: 400 });
   }
 
-  const result = await ingestEmail({ from, subject, text });
+  // Providers that forward headers let Servo recognise bounces and
+  // auto-replies reliably; the sender/subject heuristics cover the rest.
+  const headers =
+    payload.headers && typeof payload.headers === "object"
+      ? (payload.headers as Record<string, string | undefined>)
+      : undefined;
+  const result = await ingestEmail({ from, subject, text, headers });
   if (result.action === "ignored") {
     return Response.json({ ok: true, ...result });
   }
