@@ -1,13 +1,14 @@
 // Servo as an MCP server: exposes the tool registry (minus the ticket-bound
-// core tools) plus the Servo-native tools over the Model Context Protocol,
-// so external MCP clients — Claude Code/Desktop, other agents — can operate
-// the service desk. Transport is Streamable HTTP in stateless JSON mode.
+// core tools and anything gated on human approval) plus the Servo-native tools
+// over the Model Context Protocol, so external MCP clients — Claude Code/
+// Desktop, other agents — can operate the service desk. Transport is
+// Streamable HTTP in stateless JSON mode.
 //
 // Auth follows the integration pattern: env MCP_TOKEN wins over the token
 // stored in Settings; without any token the endpoint refuses to serve.
 
 import { db } from "@/lib/db";
-import { getToolRegistry } from "@/lib/ai/custom-tools";
+import { ensureToolPolicies, getToolRegistry } from "@/lib/ai/custom-tools";
 import { CORE_TOOLS } from "@/lib/agent-profiles";
 import { getAiSettings } from "@/lib/ai/settings";
 import { applySlaToTicket } from "@/lib/sla";
@@ -93,20 +94,50 @@ const NATIVE_TOOLS: Record<string, ToolDef> = {
 
 };
 
-/** Tools served over MCP: registry minus the run-bound core tools, plus the
- * Servo-native ones. Availability still respects disabled tool policies. */
+/**
+ * Tools served over MCP: registry minus the run-bound core tools, plus the
+ * Servo-native ones. A registry tool is served only if its policy row exists,
+ * is enabled, and does not require approval — MCP has no human in the loop, so
+ * an approval-gated tool must never be reachable here. Deny-by-default on a
+ * missing policy row mirrors the agent loop, which treats it as unavailable.
+ */
 export async function getMcpTools(): Promise<Record<string, ToolDef>> {
+  await ensureToolPolicies(); // backfill built-ins added by an upgrade
   const [registry, policies] = await Promise.all([
     getToolRegistry(),
-    db.toolPolicy.findMany({ where: { enabled: false }, select: { toolName: true } }),
+    db.toolPolicy.findMany({
+      select: { toolName: true, enabled: true, requiresApproval: true },
+    }),
   ]);
-  const disabled = new Set(policies.map((p) => p.toolName));
+  const byName = new Map(policies.map((p) => [p.toolName, p]));
   const served: Record<string, ToolDef> = {};
   for (const [name, tool] of Object.entries(registry)) {
-    if (CORE_TOOLS.includes(name) || disabled.has(name)) continue;
+    if (CORE_TOOLS.includes(name)) continue;
+    const policy = byName.get(name);
+    if (!policy || !policy.enabled || policy.requiresApproval) continue;
     served[name] = tool;
   }
   return { ...served, ...NATIVE_TOOLS };
+}
+
+/**
+ * Why a tool the caller asked for exists in Servo but is withheld from MCP,
+ * or null when the name is genuinely unknown. Follows the tool contract:
+ * a descriptive string the calling agent can read and adapt to.
+ */
+export async function mcpToolWithholdReason(name: string): Promise<string | null> {
+  const registry = await getToolRegistry();
+  if (!registry[name]) return null;
+  if (CORE_TOOLS.includes(name)) {
+    return `Error: "${name}" only runs inside a ticket's agent run and is not available over MCP.`;
+  }
+  const policy = await db.toolPolicy.findUnique({ where: { toolName: name } });
+  if (!policy) return `Error: "${name}" has no tool policy, so it is not available over MCP.`;
+  if (!policy.enabled) return `Error: "${name}" is disabled by policy.`;
+  if (policy.requiresApproval) {
+    return `Error: "${name}" requires human approval, which an MCP caller cannot obtain. File a ticket with create_ticket and let a Servo agent run it under the approval gate.`;
+  }
+  return null;
 }
 
 /** Context for MCP-invoked executions. Only the (excluded) core tools read

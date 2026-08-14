@@ -16,7 +16,8 @@ mock of itself. Have an opinion on priorities? Open an issue.
 - Secrets encrypted at rest (AES-256-GCM); first-run wizard; clean installs
 - Desk memory: agents search past tickets and their recorded resolutions for
   precedent before acting, with other requesters' identities withheld
-- MCP server: external agents can file/search tickets and operate gated tools
+- MCP server: external agents can file/search tickets and run the tools that
+  need no human approval (approval-gated ones stay behind a ticket)
 - Groups with JUNIOR→MID→SENIOR escalation, SLA targets with auto-escalation
 - Outbound signed webhooks; custom HTTP tools; Docker one-liner deploy
 
