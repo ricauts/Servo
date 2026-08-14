@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { getMcpConfig, getMcpTools, mcpToolContext } from "@/lib/mcp";
+import { getMcpConfig, getMcpTools, mcpToolContext, mcpToolWithholdReason } from "@/lib/mcp";
 
 export const dynamic = "force-dynamic";
 
@@ -90,7 +90,15 @@ export async function POST(req: NextRequest) {
       const args = (message.params?.arguments ?? {}) as Record<string, unknown>;
       const tools = await getMcpTools();
       const tool = tools[name];
-      if (!tool) return rpcError(id, -32602, `Unknown tool: ${name}`);
+      if (!tool) {
+        // A tool Servo has but withholds (approval-gated, disabled, ticket-bound)
+        // answers as a tool error so the caller can read why and adapt.
+        const withheld = await mcpToolWithholdReason(name);
+        if (withheld) {
+          return rpcResult(id, { content: [{ type: "text", text: withheld }], isError: true });
+        }
+        return rpcError(id, -32602, `Unknown tool: ${name}`);
+      }
       const ctx = await mcpToolContext();
       if (!ctx) return rpcError(id, -32603, "Servo has no system agents yet — run setup.");
       try {

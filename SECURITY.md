@@ -67,6 +67,10 @@ Servo. Environment-variable credentials (`ANTHROPIC_API_KEY`, `GITHUB_TOKEN`,
   unmet objective is never marked resolved.
 - The MCP endpoint and the inbound-email webhook are disabled until you set
   their bearer/shared secrets; use long random values.
+- The MCP endpoint has no human in the loop, so it **never serves a tool whose
+  policy requires approval** (nor disabled or ticket-bound ones): they are
+  absent from `tools/list` and refused by `tools/call`. An external agent that
+  needs one files a ticket instead, where the approval gate applies.
 - Prompt-injection caution: ticket text reaches the models. The approval
   gates on risky tools are the mitigation — do not disable them for tools
   that can mutate systems, and treat the tool allowlist per agent as a
