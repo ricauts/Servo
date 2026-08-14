@@ -174,14 +174,53 @@ breaches escalate automatically.
 - **API key** assigns a pool credential; **Edit .md** edits the persona
   in place. Files in `agents/` sync on setup; UI edits win afterwards.
 
-## 5. Monitoring
+## 5. Desk skills — what agents always do
+
+**Skills** page. A specialized agent is *who* works the ticket; a skill is
+*what this desk has decided to always do* about a class of problem — how to
+handle a lockout, what to check before a database change, when to escalate
+instead of resolving. Each one is a Markdown document (frontmatter: `name`,
+`description`, `categories`; body = the procedure).
+
+How an agent uses them:
+
+- Its system prompt lists only the **name and description** of each enabled
+  skill, so a desk can hold dozens without bloating every prompt.
+- When one looks relevant, the agent calls `read_skill` to load the full
+  procedure. Applicable skills are listed first.
+- `categories: []` means the skill applies to **every** ticket — that is how
+  desk-wide policy is written.
+- A skill never overrides an approval gate. It tells the agent what to do; the
+  gate still decides whether the agent may do it.
+- **QA** is shown which skills applied and which the run actually read, so an
+  agreed procedure that gets ignored is caught before the ticket closes.
+
+Managing them:
+
+- **New skill** writes one from a template; **Edit SKILL.md** edits it in
+  place. Renaming is safe — the slug agents use never moves.
+- The switch **retracts** a skill: agents are told a disabled skill must not
+  be followed. Prefer this to deleting, since a bundled skill returns on the
+  next upgrade.
+- Files in `skills/<slug>/SKILL.md` sync on setup, exactly like `agents/`;
+  existing rows are never overwritten, so UI edits win afterwards.
+
+> **Upgrading an existing install:** specialists you have already edited keep
+> the tool allowlist you gave them, so they will not have `read_skill` yet.
+> Add it once from **Agents → Tools** on each specialist. Agents left on
+> "all enabled tools" — and the default resolver — pick it up automatically.
+
+External MCP clients can read skills too: `read_skill` is served over
+`POST /api/mcp`, so an agent outside Servo can follow the same procedures.
+
+## 6. Monitoring
 
 The dashboard covers the last 30 days: open tickets, first-response and
 resolution averages, SLA breaches, AI-vs-human resolutions, AI reply
 acceptance, approvals. The Agents page adds per-key/per-agent token and
 latency throughput.
 
-## 6. Troubleshooting
+## 7. Troubleshooting
 
 | Symptom | Fix |
 |---|---|
@@ -193,10 +232,11 @@ latency throughput.
 | GitHub/Azure tools "simulated" | No token/credentials configured for that integration |
 | `fetch_url`/integration says "Blocked" | Internal or unlisted host — add it under Integrations → **Outbound web access** (exactly, no `*`, to permit a private address) |
 | An upgraded agent never uses `fetch_url` | Specialists you have edited keep their saved allowlist — add the tool under Agents → Tools |
+| An agent ignores a desk skill | Its allowlist is missing `read_skill` — add it from **Agents → Tools** |
 | `SERVO_ENCRYPTION_KEY is not set but…` errors | The DB holds encrypted secrets; set the original key in the environment |
 | Secrets saved before enabling encryption | `node scripts/encrypt-secrets.cjs` seals them once |
 
-## 7. Good habits
+## 8. Good habits
 
 - Keep approval gates on anything that mutates external systems.
 - Keep the outbound allowlist as tight as your desk can stand, and treat
@@ -204,3 +244,4 @@ latency throughput.
 - Scope integration credentials tightly and rotate anything ever shared.
 - Set `AUTH_SECRET`, `SERVO_ENCRYPTION_KEY` and HTTPS before real users.
 - Review the escalation groups so no category dead-ends.
+- Write a skill the first time you correct an agent twice for the same thing.

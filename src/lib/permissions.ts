@@ -11,6 +11,8 @@ export type Action =
   | "group.manage"
   | "agents.view"
   | "agents.manage"
+  | "skills.view"
+  | "skills.manage"
   | "agent.run"
   | "approval.view"
   | "approval.decide"
@@ -27,6 +29,8 @@ const MATRIX: Record<Action, Role[]> = {
   "group.manage": ["ADMIN"],
   "agents.view": ["ADMIN", "AGENT"],
   "agents.manage": ["ADMIN"],
+  "skills.view": ["ADMIN", "AGENT"],
+  "skills.manage": ["ADMIN"],
   "agent.run": ["ADMIN", "AGENT"],
   "approval.view": ["ADMIN", "AGENT"],
   "approval.decide": ["ADMIN", "AGENT"],

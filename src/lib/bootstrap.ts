@@ -10,6 +10,7 @@ import path from "path";
 import { db } from "./db";
 import { opsDb } from "./opsdb";
 import { parseProfileMarkdown, slugify } from "./agent-profile-format";
+import { parseSkillMarkdown } from "./skill-format";
 
 /** The three system AI users the engine looks up by aiKind. */
 export async function ensureAiAgents(): Promise<void> {
@@ -58,6 +59,50 @@ export async function syncAgentProfiles(): Promise<number> {
         categories: JSON.stringify(parsed.categories),
         tools: JSON.stringify(parsed.tools),
         systemPrompt: parsed.systemPrompt,
+        markdown,
+      },
+    });
+    created++;
+  }
+  return created;
+}
+
+/**
+ * Create any bundled skills/<slug>/SKILL.md that is not in the database yet.
+ * Same contract as syncAgentProfiles(): existing rows are never touched, so an
+ * upgrade adds new procedures without reverting the ones an admin has edited
+ * or deliberately disabled.
+ *
+ * The directory name is the slug — that is what read_skill takes and what the
+ * catalogue advertises, so it stays stable when the display name is reworded.
+ */
+export async function syncSkills(): Promise<number> {
+  const skillsDir = path.join(process.cwd(), "skills");
+  if (!fs.existsSync(skillsDir)) return 0;
+  let created = 0;
+  for (const entry of fs
+    .readdirSync(skillsDir, { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .sort((a, b) => a.name.localeCompare(b.name))) {
+    const file = path.join(skillsDir, entry.name, "SKILL.md");
+    if (!fs.existsSync(file)) continue;
+    const markdown = fs.readFileSync(file, "utf8");
+    let parsed;
+    try {
+      parsed = parseSkillMarkdown(markdown);
+    } catch {
+      continue; // a malformed bundled skill must not block setup
+    }
+    const slug = slugify(entry.name);
+    const existing = await db.skill.findUnique({ where: { slug } });
+    if (existing) continue;
+    await db.skill.create({
+      data: {
+        slug,
+        name: parsed.name,
+        description: parsed.description,
+        categories: JSON.stringify(parsed.categories),
+        body: parsed.body,
         markdown,
       },
     });

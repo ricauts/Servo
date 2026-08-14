@@ -13,6 +13,7 @@ import {
   ensureAiAgents,
   ensureOpsSchema,
   syncAgentProfiles,
+  syncSkills,
 } from "../src/lib/bootstrap";
 import { DEFAULT_TOOL_POLICIES } from "../src/lib/ai/tool-policies";
 import { DEFAULT_SLA_POLICIES } from "../src/lib/sla-rules";
@@ -38,11 +39,13 @@ async function main() {
   }
 
   const created = await syncAgentProfiles();
+  const skills = await syncSkills();
   await ensureOpsSchema();
 
   console.log(
     `Done. AI agents ready, ${DEFAULT_TOOL_POLICIES.length} tool policies, ` +
-      `${DEFAULT_SLA_POLICIES.length} SLA policies, ${created} new agent profile(s).`,
+      `${DEFAULT_SLA_POLICIES.length} SLA policies, ${created} new agent profile(s), ` +
+      `${skills} new skill(s).`,
   );
   console.log("Open the app — the /setup wizard creates your admin account.");
 }

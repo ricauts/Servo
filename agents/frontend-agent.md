@@ -7,6 +7,7 @@ tools:
   - search_tickets
   - read_ticket
   - requester_history
+  - read_skill
   - github_list_repos
   - github_read_file
   - github_edit_file

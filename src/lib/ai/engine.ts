@@ -21,6 +21,11 @@ import {
   pickGroupAssignee,
 } from "@/lib/escalation";
 import { pickAgentProfile, profileAllowsTool } from "@/lib/agent-profiles";
+import {
+  enabledSkillCatalog,
+  skillCatalogSection,
+  skillReviewSection,
+} from "@/lib/skills";
 import { settingsForProfile, withUsage } from "./credentials";
 import { notifyApprovalPending } from "@/lib/notify";
 import { emitEvent } from "@/lib/webhooks";
@@ -197,9 +202,17 @@ async function buildLoopContext(
   const activePolicies = enabledPolicies.filter((policy) =>
     profileAllowsTool(profile, policy.toolName),
   );
+  // The desk's agreed procedures, advertised as a catalogue the agent opens
+  // with read_skill. Only when that tool actually survived the allowlist —
+  // otherwise the prompt would name procedures the agent cannot read.
+  const canReadSkills = activePolicies.some((p) => p.toolName === "read_skill");
+  const skillSection = canReadSkills
+    ? skillCatalogSection(await enabledSkillCatalog(), ticket.category)
+    : "";
+  const base = resolverSystem(activePolicies, skillSection);
   const system = profile
-    ? `${resolverSystem(activePolicies)}\n\n## Specialization: ${profile.name}\n\n${profile.systemPrompt}`
-    : resolverSystem(activePolicies);
+    ? `${base}\n\n## Specialization: ${profile.name}\n\n${profile.systemPrompt}`
+    : base;
   return {
     runId,
     ticket,
@@ -721,10 +734,34 @@ async function runQaReview(ctx: LoopContext): Promise<void> {
         model: ctx.settings.model,
       },
     );
+    // Which desk skills applied, and which the run actually opened. Read from
+    // the persisted steps so it survives pause/resume like the risk check above.
+    const skillReads = await db.agentStep.findMany({
+      where: { runId: ctx.runId, type: "TOOL_CALL", toolName: "read_skill" },
+      select: { content: true },
+    });
+    const readSlugs = skillReads
+      .map((step) => {
+        try {
+          return String((JSON.parse(step.content) as { slug?: unknown }).slug ?? "");
+        } catch {
+          return "";
+        }
+      })
+      .filter(Boolean);
+    const skillSection = skillReviewSection(
+      await enabledSkillCatalog(),
+      ctx.ticket.category,
+      readSlugs,
+    );
+
     const turn = await qaProvider.complete({
       system: qaSystem,
       messages: [
-        { role: "user", content: [{ type: "text", text: qaPrompt(run, ctx.ticket) }] },
+        {
+          role: "user",
+          content: [{ type: "text", text: qaPrompt(run, ctx.ticket, skillSection) }],
+        },
       ],
       tools: [],
     });

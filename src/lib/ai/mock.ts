@@ -87,7 +87,7 @@ export class MockProvider implements ChatProvider {
     const available = new Set(p.tools.map((t) => t.name));
     const script = hasRejectionResult(p.messages)
       ? this.rejectionScript()
-      : this.script(available);
+      : [...this.skillStep(p.system, p.tools), ...this.script(available)];
     const used = usedToolNames(p.messages);
     const next = script.find((step) => !used.has(step.name));
     if (!next) {
@@ -171,6 +171,28 @@ export class MockProvider implements ChatProvider {
   }
 
   // -- RESOLVE --------------------------------------------------------------
+
+  /**
+   * Consult the desk's procedure before acting, when there is one to consult.
+   * The catalogue is advertised in the system prompt as `- <slug> (scope): …`,
+   * so the mock reads it the way a real model would rather than being handed a
+   * slug out of band — which keeps the offline demo honest about the flow and
+   * means a desk with no skills produces exactly the old script.
+   */
+  private skillStep(system: string, tools: ToolSpec[]): ScriptStep[] {
+    if (!tools.some((t) => t.name === "read_skill")) return [];
+    const section = system.split("## Desk skills")[1];
+    if (!section) return [];
+    const slug = section.match(/^- ([a-z0-9-]+) \(/m)?.[1];
+    if (!slug) return [];
+    return [
+      {
+        name: "read_skill",
+        input: { slug },
+        plan: `This desk has an agreed procedure for requests like this — I'll read "${slug}" before touching anything.`,
+      },
+    ];
+  }
 
   private script(available: Set<string> = new Set()): ScriptStep[] {
     const ticket = this.ctx.ticket;
