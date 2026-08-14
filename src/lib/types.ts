@@ -102,6 +102,8 @@ export const SETTING_KEYS = {
   smtpUrl: "integration.smtp.url", // smtp://user:pass@host:port — env SMTP_URL wins; never returned by the API
   smtpFrom: "integration.smtp.from", // From address for notifications
 } as const;
+// Per-integration keys live with their module: GITHUB_SETTING_KEYS,
+// AZURE_SETTING_KEYS, MCP_SETTING_KEYS, EGRESS_SETTING_KEYS…
 
 // ---------------------------------------------------------------------------
 // KPI endpoint response (GET /api/kpis)

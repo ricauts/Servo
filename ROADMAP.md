@@ -20,6 +20,8 @@ mock of itself. Have an opinion on priorities? Open an issue.
   need no human approval (approval-gated ones stay behind a ticket)
 - Groups with JUNIOR→MID→SENIOR escalation, SLA targets with auto-escalation
 - Outbound signed webhooks; custom HTTP tools; Docker one-liner deploy
+- `fetch_url` reads public pages as text, behind an SSRF-safe egress guard
+  with an optional per-host allowlist (also covers screenshots and HTTP tools)
 
 ## In progress
 
@@ -39,7 +41,7 @@ mock of itself. Have an opinion on priorities? Open an issue.
   pipeline)
 - AWS & GCP tooling behind the same approval gates
 - Slack & Teams companion apps (notify + approve from chat)
-- Egress allowlist for custom HTTP tools; built-in rate limiting
+- Built-in rate limiting on the HTTP surface
 - Immutable audit log export
 - Multi-tenant workspaces
 

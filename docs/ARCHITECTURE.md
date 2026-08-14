@@ -194,6 +194,18 @@ editable in Settings at runtime:
 | `cloud_apply_deployment` | Apply a deployment plan (simulated) | HIGH | **Yes** |
 | `post_comment` | Post a public comment on the ticket | LOW | No |
 | `resolve_ticket` | Mark the ticket resolved with a note | LOW | No |
+| `fetch_url` | Read an http(s) page as text, through the egress guard | LOW | No |
+
+**Outbound requests** (`src/lib/egress.ts`). `fetch_url`, `take_screenshot`
+and the admin-defined HTTP integrations do not call `fetch()` directly: a URL
+an agent picked may have come from the email that opened the ticket. The guard
+allows http(s) only, refuses embedded credentials, resolves the host and
+rejects loopback/private/CGNAT/link-local/multicast answers, and re-checks
+every redirect hop. `integration.egress.allowlist` (Integrations → Outbound
+web access) narrows this to named hosts; a literal entry there also permits a
+private address, which is the deliberate way to reach an internal service. A
+refusal is returned to the model as a readable tool result, so the run adapts
+instead of failing.
 
 Approval decisions are themselves permission-gated
 (`src/lib/permissions.ts`): admins can decide anything; agents can decide

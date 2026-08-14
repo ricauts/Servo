@@ -9,6 +9,7 @@ import { azureConfigured, getAzureConfig, AZURE_SETTING_KEYS } from "@/lib/integ
 import { getInboundConfig, INBOUND_SETTING_KEYS } from "@/lib/inbound-email";
 import { AUTH_SETTING_KEYS } from "@/lib/authjs";
 import { getMcpConfig, MCP_SETTING_KEYS } from "@/lib/mcp";
+import { EGRESS_SETTING_KEYS, getEgressConfig } from "@/lib/egress";
 import { forbid } from "@/lib/permissions";
 import { SETTING_KEYS } from "@/lib/types";
 
@@ -26,13 +27,14 @@ async function settingsPayload() {
     if (row.key === MCP_SETTING_KEYS.token) continue; // never leak the token
     settings[row.key] = row.value;
   }
-  const [ai, smtp, github, azure, inbound, mcp] = await Promise.all([
+  const [ai, smtp, github, azure, inbound, mcp, egress] = await Promise.all([
     getAiSettings(),
     getSmtpConfig(),
     getGithubConfig(),
     getAzureConfig(),
     getInboundConfig(),
     getMcpConfig(),
+    getEgressConfig(),
   ]);
   const toolPolicies = await db.toolPolicy.findMany({ orderBy: { toolName: "asc" } });
   return {
@@ -49,6 +51,7 @@ async function settingsPayload() {
     inboundSecretSource: inbound.secretSource,
     mcpTokenSet: mcp.token.length > 0,
     mcpTokenSource: mcp.tokenSource,
+    egressAllowlist: egress.allowlist,
     toolPolicies,
   };
 }
@@ -88,6 +91,7 @@ const putSchema = z.object({
   authAdminEmails: z.string().optional(),
   authAllowedDomains: z.string().optional(), // empty string = any domain may sign in
   mcpToken: z.string().optional(), // empty string disables the MCP endpoint
+  egressAllowlist: z.string().optional(), // empty string = any public host may be opened
 });
 
 /** PUT /api/settings — upsert any subset of the AI settings (admin only). */
@@ -158,6 +162,9 @@ export async function PUT(req: NextRequest) {
     updates.push({ key: AUTH_SETTING_KEYS.allowedDomains, value: data.authAllowedDomains });
   }
   if (data.mcpToken !== undefined) updates.push({ key: MCP_SETTING_KEYS.token, value: data.mcpToken });
+  if (data.egressAllowlist !== undefined) {
+    updates.push({ key: EGRESS_SETTING_KEYS.allowlist, value: data.egressAllowlist });
+  }
 
   for (const update of updates) {
     await db.setting.upsert({

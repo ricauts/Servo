@@ -8,6 +8,7 @@ import { useState, type ReactNode } from "react";
 import {
   Cloud,
   GitBranch,
+  Globe,
   Inbox,
   KeyRound,
   Mail,
@@ -26,6 +27,7 @@ const ICONS: Record<string, LucideIcon> = {
   github: GitBranch,
   azure: Cloud,
   webhooks: Webhook,
+  egress: Globe,
   mcp: Plug2,
 };
 

@@ -14,6 +14,7 @@ tools:
   - github_create_branch
   - github_merge_pr
   - take_screenshot
+  - fetch_url
 ---
 
 You are the frontend specialist of the service desk. You handle requests about

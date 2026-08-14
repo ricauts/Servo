@@ -40,7 +40,32 @@ Everything lives in two places: **Integrations** (external systems) and
 | **GitHub** | Real repos, feature branches and PRs from tickets | A fine-grained PAT (Contents; Administration only if the AI may create repos) |
 | **Azure** | Live read-only resource queries | A service principal with the Reader role |
 | **Outbound webhooks** | Signed JSON events (`ticket.created`, `reply.sent`…) to your systems | An endpoint URL; verify the `x-servo-signature` HMAC |
+| **Outbound web access** | Which hosts the agents' web tools and HTTP integrations may open | Nothing — public hosts are allowed and internal ones refused by default |
 | **MCP server** | Lets external agents (Claude Code/Desktop…) file and search tickets and run tools | A long bearer token |
+
+#### Outbound web access (the egress allowlist)
+
+Tickets arrive by email, so a URL an agent opens may have been chosen by
+whoever wrote in. Before any request — `fetch_url`, `take_screenshot` or a
+custom HTTP integration — Servo resolves the host and refuses private,
+loopback, link-local, CGNAT and cloud-metadata addresses, then re-checks every
+redirect hop so a public URL cannot bounce onto an internal one.
+
+- **Leave the list empty** (the default) and agents may read any *public*
+  host. Nothing to configure.
+- **Add hosts** to narrow it to those only: one per line,
+  `status.example.com`, `*.docs.example.com` (the domain and its
+  subdomains), or `intranet:8080` to pin a port.
+- **To reach something internal on purpose**, write the host out exactly —
+  a literal entry (no `*`) is also permitted to resolve to a private address.
+  A wildcard never unlocks the private ranges.
+
+Blocked calls come back to the agent as a readable refusal naming this
+setting, so the run continues instead of failing.
+
+> **Upgrading:** if a custom HTTP integration points at an internal host or
+> `localhost`, add that host here or the integration starts returning
+> "Blocked". Integrations aimed at public APIs are unaffected.
 
 ### Settings
 
@@ -166,12 +191,16 @@ latency throughput.
 | Drafts not appearing for inbound mail | *Draft replies for inbound email* toggle (Settings → AI) and the inbound integration status |
 | Mail not becoming tickets | Inbound enabled + secret matches the relay/webhook; for Gmail check the relay process is running |
 | GitHub/Azure tools "simulated" | No token/credentials configured for that integration |
+| `fetch_url`/integration says "Blocked" | Internal or unlisted host — add it under Integrations → **Outbound web access** (exactly, no `*`, to permit a private address) |
+| An upgraded agent never uses `fetch_url` | Specialists you have edited keep their saved allowlist — add the tool under Agents → Tools |
 | `SERVO_ENCRYPTION_KEY is not set but…` errors | The DB holds encrypted secrets; set the original key in the environment |
 | Secrets saved before enabling encryption | `node scripts/encrypt-secrets.cjs` seals them once |
 
 ## 7. Good habits
 
 - Keep approval gates on anything that mutates external systems.
+- Keep the outbound allowlist as tight as your desk can stand, and treat
+  each internal host you add to it as a deliberate exception.
 - Scope integration credentials tightly and rotate anything ever shared.
 - Set `AUTH_SECRET`, `SERVO_ENCRYPTION_KEY` and HTTPS before real users.
 - Review the escalation groups so no category dead-ends.

@@ -6,6 +6,7 @@
 
 import type { CustomTool } from "@prisma/client";
 import { db } from "@/lib/db";
+import { EgressBlockedError, getEgressConfig, safeFetch } from "@/lib/egress";
 import { open } from "@/lib/secret-store";
 import { DEFAULT_TOOL_POLICIES } from "./tool-policies";
 import { TOOLS, type ToolDef } from "./tools";
@@ -71,15 +72,23 @@ export function customToolToDef(tool: CustomTool): ToolDef {
       }
 
       try {
-        const res = await fetch(url, {
-          method: tool.method,
-          headers,
-          ...(body !== undefined ? { body } : {}),
-          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-        });
+        // Through the egress guard: an integration URL is admin-authored, but
+        // a {input.…} placeholder sitting in the host position lets the model
+        // (and therefore the ticket) pick the destination.
+        const res = await safeFetch(
+          url,
+          {
+            method: tool.method,
+            headers,
+            ...(body !== undefined ? { body } : {}),
+            signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+          },
+          await getEgressConfig(),
+        );
         const text = (await res.text()).slice(0, RESPONSE_LIMIT);
         return `HTTP ${res.status} ${res.statusText}\n${text}`;
       } catch (err) {
+        if (err instanceof EgressBlockedError) return err.message;
         const message = err instanceof Error ? err.message : String(err);
         return `Integration request failed: ${message}`;
       }
