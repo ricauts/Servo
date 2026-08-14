@@ -174,12 +174,16 @@ that human follow-up is needed) rather than retrying the same call.
 
 ## Tool registry and risk/approval policy
 
-Ten tools are registered in `src/lib/ai/tools.ts`; their names match the
-seeded `ToolPolicy` rows exactly. Risk levels and approval flags below are the
-seeded defaults — all editable in Settings at runtime:
+The built-in tools live in `src/lib/ai/tools/`, one module per domain, and
+their names match the seeded `ToolPolicy` rows in `src/lib/ai/tool-policies.ts`
+exactly. Risk levels and approval flags below are the seeded defaults — all
+editable in Settings at runtime:
 
 | Tool | What it does | Risk | Requires approval |
 |---|---|---|---|
+| `search_tickets` | Ranked search over past tickets and their recorded resolutions | LOW | No |
+| `read_ticket` | One past ticket in full: request, replies, tools used, resolution | LOW | No |
+| `requester_history` | The other tickets a requester has filed, and how each ended | LOW | No |
 | `query_ops_database` | Read-only SQL (SELECT/WITH only, single statement) against the sandbox ops DB | LOW | No |
 | `execute_ops_sql` | Mutating SQL (CREATE/INSERT/UPDATE/DELETE/DROP) against the sandbox ops DB | HIGH | **Yes** |
 | `get_device_info` | Device inventory lookup by asset tag (parameterized query) | LOW | No |

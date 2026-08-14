@@ -4,6 +4,9 @@ description: Web & UI specialist — landing pages, styling, accessibility and f
 categories:
   - SOFTWARE
 tools:
+  - search_tickets
+  - read_ticket
+  - requester_history
   - github_list_repos
   - github_read_file
   - github_edit_file

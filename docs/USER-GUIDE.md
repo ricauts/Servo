@@ -95,6 +95,35 @@ and finishes honestly:
   tried; unmet objectives are never marked resolved.
 - Risky runs get an automated **QA review**; failures reassign to a human.
 
+### Desk memory (the agent checks precedent first)
+
+A service desk repeats itself. Before acting, the resolver searches the
+tickets **your** desk has already closed and reuses what worked:
+
+- `search_tickets` — ranked search over past tickets (title, description and
+  the recorded resolution), preferring ones that actually reached an outcome.
+  Filter by `category`, or to resolved tickets only.
+- `read_ticket` — one past ticket in full: the request, the replies sent, the
+  tools the agent used and the resolution note.
+- `requester_history` — the requester's other tickets, so a third replacement
+  dock in two months reads as a hardware fault, not a new request.
+
+All three are read-only (risk **LOW**, no approval) and need no configuration
+— they work on a fresh install and are backfilled on upgrade. Two things are
+worth knowing:
+
+- **Other requesters stay anonymous.** Precedent comes back with names and
+  emails withheld unless the past ticket belongs to the same requester, so an
+  agent cannot repeat one person's details to another. Turn a tool off
+  entirely in **Settings → Tools** if you want none of it.
+- **Existing specialists must opt in.** Upgrades never overwrite an agent you
+  have edited, so a specialist created before this feature keeps its old tool
+  list. Open **Agents → Tools** and tick the three tools to grant them; new
+  installs have them from the start.
+
+External MCP clients get the same three tools (with the same redaction) from
+the Servo MCP server.
+
 ### Approvals inbox
 
 One queue for everything that needs a human: tool sign-offs (HIGH risk is

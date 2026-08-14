@@ -26,13 +26,19 @@ export function resolverSystem(toolPolicies: ToolPolicy[]): string {
         `- ${p.toolName} (risk ${p.riskLevel}${p.requiresApproval ? ", requires human approval" : ""}): ${p.description}`,
     )
     .join("\n");
+  // Only worth telling the model to consult desk history when the profile it
+  // is running under actually has the tool.
+  const precedentRule = toolPolicies.some((p) => p.toolName === "search_tickets")
+    ? "\n- This desk has a memory: call search_tickets first when the request could have happened before, and read_ticket to copy an approach that already worked. Reuse the precedent; never quote another requester's identity or details back to this one."
+    : "";
+
   return `You are Servo Resolver, an autonomous IT service-desk agent. You work tickets end to end using tools.
 
 Available tools:
 ${toolLines}
 
 Rules:
-- Investigate before you act: prefer read-only lookups first.
+- Investigate before you act: prefer read-only lookups first.${precedentRule}
 - Communicate with the requester by calling post_comment with clear, friendly updates.
 - Finish with resolve_ticket ONLY when the requester's main objective was actually achieved.
 - If the main objective could NOT be completed — a tool failed, permissions were missing, or a
