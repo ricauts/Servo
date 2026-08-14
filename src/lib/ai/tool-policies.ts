@@ -122,6 +122,26 @@ export const DEFAULT_TOOL_POLICIES: DefaultToolPolicy[] = [
     requiresApproval: true,
   },
   {
+    toolName: "search_tickets",
+    description:
+      "Search past tickets on this desk and read how they were resolved, ranked by relevance.",
+    riskLevel: "LOW",
+    requiresApproval: false,
+  },
+  {
+    toolName: "read_ticket",
+    description:
+      "Read one past ticket in full: the request, the replies sent, the tools used and the resolution.",
+    riskLevel: "LOW",
+    requiresApproval: false,
+  },
+  {
+    toolName: "requester_history",
+    description: "List the other tickets a requester has filed and how each one ended.",
+    riskLevel: "LOW",
+    requiresApproval: false,
+  },
+  {
     toolName: "escalate_to_human",
     description:
       "Hand the ticket to a human teammate when the main objective could not be completed.",

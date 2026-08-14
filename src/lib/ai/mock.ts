@@ -84,7 +84,10 @@ export class MockProvider implements ChatProvider {
       };
     }
 
-    const script = hasRejectionResult(p.messages) ? this.rejectionScript() : this.script();
+    const available = new Set(p.tools.map((t) => t.name));
+    const script = hasRejectionResult(p.messages)
+      ? this.rejectionScript()
+      : this.script(available);
     const used = usedToolNames(p.messages);
     const next = script.find((step) => !used.has(step.name));
     if (!next) {
@@ -169,10 +172,21 @@ export class MockProvider implements ChatProvider {
 
   // -- RESOLVE --------------------------------------------------------------
 
-  private script(): ScriptStep[] {
+  private script(available: Set<string> = new Set()): ScriptStep[] {
     const ticket = this.ctx.ticket;
     const text = `${ticket.title} ${ticket.description}`;
     const steps: ScriptStep[] = [];
+
+    // Desk memory first, mirroring the rule the real resolver is given: check
+    // whether this desk has solved the request before. Only when the running
+    // profile actually has the tool — an admin can disable it.
+    if (available.has("search_tickets")) {
+      steps.push({
+        name: "search_tickets",
+        input: { query: ticket.title, resolvedOnly: true },
+        plan: "Before acting I'll check whether this desk has already solved a ticket like this one.",
+      });
+    }
     let comment =
       "I've reviewed this request. No automated action was applicable, so I'm summarizing my findings here — a teammate can pick this up if anything else is needed.";
     let resolution = "Reviewed by the AI resolver.";

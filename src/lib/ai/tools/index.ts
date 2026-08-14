@@ -6,6 +6,7 @@
 
 import { cloudTools } from "./cloud";
 import { githubTools } from "./github";
+import { historyTools } from "./history";
 import { identityTools } from "./identity";
 import { opsDbTools } from "./ops-db";
 import { ticketTools } from "./ticket";
@@ -15,6 +16,7 @@ export type { ToolContext, ToolDef } from "./types";
 
 export const TOOLS = {
   ...opsDbTools,
+  ...historyTools,
   ...identityTools,
   ...githubTools,
   ...cloudTools,

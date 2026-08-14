@@ -14,6 +14,8 @@ mock of itself. Have an opinion on priorities? Open an issue.
   allowlists and per-agent API keys (BYOK pool with usage metering)
 - SSO via any OIDC IdP, domain allowlist, requester data isolation
 - Secrets encrypted at rest (AES-256-GCM); first-run wizard; clean installs
+- Desk memory: agents search past tickets and their recorded resolutions for
+  precedent before acting, with other requesters' identities withheld
 - MCP server: external agents can file/search tickets and operate gated tools
 - Groups with JUNIOR→MID→SENIOR escalation, SLA targets with auto-escalation
 - Outbound signed webhooks; custom HTTP tools; Docker one-liner deploy
