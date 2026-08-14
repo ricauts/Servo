@@ -187,6 +187,19 @@ export class MockProvider implements ChatProvider {
         plan: "Before acting I'll check whether this desk has already solved a ticket like this one.",
       });
     }
+
+    // A ticket that points at a page: read it before reasoning about it. The
+    // guard in src/lib/egress.ts decides whether the URL may be opened, so
+    // the offline demo shows a refusal for an internal link and a real read
+    // for a public one — without a key and without a mock of the guard.
+    const link = text.match(/https?:\/\/[^\s<>"'),\]]+/i)?.[0];
+    if (link && available.has("fetch_url")) {
+      steps.push({
+        name: "fetch_url",
+        input: { url: link },
+        plan: `The ticket points at ${link} — I'll read the page before drawing any conclusion from it.`,
+      });
+    }
     let comment =
       "I've reviewed this request. No automated action was applicable, so I'm summarizing my findings here — a teammate can pick this up if anything else is needed.";
     let resolution = "Reviewed by the AI resolver.";

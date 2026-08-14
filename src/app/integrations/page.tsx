@@ -20,7 +20,9 @@ import AuthTenantForm, {
   type AuthTenantView,
 } from "@/components/admin/AuthTenantForm";
 import McpForm, { type McpSettingsView } from "@/components/admin/McpForm";
+import EgressForm, { type EgressSettingsView } from "@/components/admin/EgressForm";
 import { getMcpConfig } from "@/lib/mcp";
+import { getEgressConfig } from "@/lib/egress";
 import { getSmtpConfig } from "@/lib/notify";
 import { getInboundConfig } from "@/lib/inbound-email";
 import { getGithubConfig } from "@/lib/integrations/github";
@@ -52,13 +54,14 @@ export default async function IntegrationsPage() {
     );
   }
 
-  const [authConfig, smtp, inbound, github, azure, mcp, webhookRows] = await Promise.all([
+  const [authConfig, smtp, inbound, github, azure, mcp, egress, webhookRows] = await Promise.all([
     getAuthConfig(),
     getSmtpConfig(),
     getInboundConfig(),
     getGithubConfig(),
     getAzureConfig(),
     getMcpConfig(),
+    getEgressConfig(),
     db.webhook.findMany({
       include: { deliveries: { orderBy: { createdAt: "desc" }, take: 5 } },
       orderBy: { createdAt: "asc" },
@@ -103,6 +106,7 @@ export default async function IntegrationsPage() {
     tokenSet: mcp.token.length > 0,
     tokenSource: mcp.tokenSource,
   };
+  const egressView: EgressSettingsView = { allowlist: egress.allowlist };
   const webhookViews: WebhookView[] = webhookRows.map((hook) => ({
     id: hook.id,
     url: hook.url,
@@ -178,6 +182,17 @@ export default async function IntegrationsPage() {
       status:
         activeWebhooks > 0 ? { label: `${activeWebhooks} active`, tone: "good" } : off,
       body: <WebhooksManager webhooks={webhookViews} />,
+    },
+    {
+      id: "egress",
+      title: "Outbound web access",
+      blurb:
+        "Which hosts agents may open with fetch_url, take_screenshot and HTTP integrations. Private and link-local addresses are always refused unless named here.",
+      status:
+        egressView.allowlist.length > 0
+          ? { label: `${egressView.allowlist.length} allowed`, tone: "good" as const }
+          : { label: "Public web", tone: "brand" as const },
+      body: <EgressForm initial={egressView} />,
     },
     {
       id: "mcp",

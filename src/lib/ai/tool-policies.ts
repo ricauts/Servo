@@ -96,6 +96,13 @@ export const DEFAULT_TOOL_POLICIES: DefaultToolPolicy[] = [
     requiresApproval: false,
   },
   {
+    toolName: "fetch_url",
+    description:
+      "Read a public http(s) page as text (status pages, vendor docs, a link the requester sent). Internal addresses are refused unless allowlisted.",
+    riskLevel: "LOW",
+    requiresApproval: false,
+  },
+  {
     toolName: "github_list_repos",
     description: "List the GitHub repositories this install can reach (cached).",
     riskLevel: "LOW",

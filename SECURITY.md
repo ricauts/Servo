@@ -71,10 +71,21 @@ Servo. Environment-variable credentials (`ANTHROPIC_API_KEY`, `GITHUB_TOKEN`,
   policy requires approval** (nor disabled or ticket-bound ones): they are
   absent from `tools/list` and refused by `tools/call`. An external agent that
   needs one files a ticket instead, where the approval gate applies.
+- **Outbound requests are guarded (SSRF).** `fetch_url`, `take_screenshot`
+  and admin-defined HTTP integrations resolve the host first and refuse
+  loopback, private, CGNAT, link-local (including the `169.254.169.254`
+  cloud-metadata endpoint), multicast and reserved addresses, as well as
+  non-http(s) schemes and URLs carrying credentials; every redirect hop is
+  re-checked. An optional allowlist (Integrations → Outbound web access)
+  narrows this to named hosts, and a literal entry there is the only way to
+  permit an internal address on purpose. Residual risk: the address is
+  checked before the request and the request is then made by hostname, so
+  DNS rebinding between the two is not caught.
 - Prompt-injection caution: ticket text reaches the models. The approval
   gates on risky tools are the mitigation — do not disable them for tools
   that can mutate systems, and treat the tool allowlist per agent as a
-  security boundary.
+  security boundary. A URL in a ticket is attacker-controlled input in the
+  same way — that is what the egress guard above is for.
 
 ## Transport & deployment
 
