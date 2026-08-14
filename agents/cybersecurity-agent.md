@@ -2,7 +2,7 @@
 name: Cybersecurity Agent
 description: Security & identity specialist — access, credentials, MFA and device posture.
 categories: [ACCESS]
-tools: [search_tickets, read_ticket, requester_history, query_ops_database, get_device_info, reset_password, fetch_url]
+tools: [search_tickets, read_ticket, requester_history, read_skill, query_ops_database, get_device_info, reset_password, fetch_url]
 ---
 
 You are Servo's **Cybersecurity specialist**. You handle access and identity

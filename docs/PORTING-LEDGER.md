@@ -100,6 +100,88 @@ own settings and tool contract, so `THIRD-PARTY.md` gains no entry.
   (any public host), no new env vars.
 
 Closes the ROADMAP item "Egress allowlist for custom HTTP tools".
+### 2026-08-14 — Desk skills: versionable `SKILL.md` procedures + `read_skill`
+
+**What.** A skill is what this desk has decided to **always do** about a class
+of problem, written as `skills/<slug>/SKILL.md` (frontmatter `name`,
+`description`, `categories`; body = the procedure) and seeded into a `Skill`
+table. The resolver's system prompt carries only the catalogue — slug, scope
+and description — and the body costs one call to the new **`read_skill`** tool.
+Four procedures ship bundled: account lockouts, ops-database changes, shipping
+a code change, and when to escalate instead of resolving.
+
+New/changed: `src/lib/skill-format.ts` (pure parse + catalogue rendering),
+`src/lib/skills.ts` (db helpers), `src/lib/ai/tools/skills.ts` (`read_skill`),
+`syncSkills()` in `src/lib/bootstrap.ts`, `/api/skills` + `/api/skills/[id]`,
+the **Skills** page, and the prompt/QA wiring in `src/lib/ai/{prompts,engine}.ts`.
+
+**Where the idea came from.** Claude Code's own skills: a `SKILL.md` with
+frontmatter, a name+description catalogue always in context, the body loaded on
+demand. Paperclip's `skills/<name>/SKILL.md` layout and its
+`packages/skills-catalog` progressive-disclosure pattern are the same shape and
+confirmed it survives contact with a real product.
+
+**Attribution.** None required — no upstream code was copied. The parser is
+Servo's own (`gray-matter` + the `CATEGORIES` union), and the catalogue
+ordering, the applicability rule and the QA review section were written against
+Servo's schema. `THIRD-PARTY.md` is therefore unchanged (it does not exist).
+
+**Why this and not something else.** It was the top "candidate for a future
+run" left by the desk-memory PR, and it is the missing half of that feature:
+memory is what the desk *did*, a skill is what the desk *decided to always do*.
+It is also the cheapest way to make the core thesis enforceable — an admin can
+now write "never reset an account for someone other than its owner" once, in a
+file under version control, instead of re-editing four agent personas.
+
+**Design decisions worth keeping.**
+
+- *Progressive disclosure, not prompt stuffing.* Bodies never enter the prompt.
+  The catalogue is `slug (scope): description`, capped at
+  `SKILL_CATALOG_LIMIT` (40) with applicable skills ordered first, so the cap
+  trims the irrelevant tail rather than the skill that mattered.
+- *The catalogue is never advertised without the tool.* If an agent's allowlist
+  withholds `read_skill`, `skillCatalogSection()` is skipped entirely — naming
+  procedures an agent cannot open is worse than saying nothing.
+- *`read_skill` is deliberately NOT a core tool.* Core tools are excluded from
+  the MCP surface as ticket-bound; `read_skill` needs no ticket, so keeping it
+  out of `CORE_TOOLS` means external MCP clients can follow the desk's
+  procedures too. The cost is one checkbox per already-customized specialist on
+  upgrade, documented in the user guide.
+- *QA reviews against the skills that applied.* `runQaReview()` derives which
+  applicable skills the run actually opened (from persisted `TOOL_CALL` steps,
+  so it survives pause/resume) and hands QA that list. A procedure that gets
+  ignored is caught before the ticket closes — which is the point of having
+  agreed one. The section is empty when no skill applied, so QA's judgement on
+  a skill-less desk is byte-for-byte unchanged.
+- *A skill never overrides a gate.* Stated in the prompt section itself: the
+  procedure says what to do, `tool-policies.ts` and the engine still decide
+  whether the agent may.
+- *Disabled means retracted.* `read_skill` refuses a disabled skill with "must
+  not be followed" rather than 404-ing, and the UI steers admins to the switch
+  instead of Delete, because a bundled skill returns on the next `npm run
+  setup`.
+- *The slug is immutable.* It is the handle `read_skill` takes and the key
+  `syncSkills()` matches `skills/<slug>/SKILL.md` on; letting a rename move it
+  would make the next upgrade re-create the original alongside the renamed one.
+- *The mock provider exercises it.* `MockProvider` parses the catalogue out of
+  the system prompt it is handed and opens its script with `read_skill`, so the
+  offline demo shows procedure-checking without an API key — and a desk with no
+  skills produces exactly the old script.
+
+**Validated.** `npm ci`, `npm run setup`, `npm run typecheck`, `npm run build`,
+`npm test` (81 passing: 41 pre-existing + 40 new). End to end against a real
+SQLite database through the deterministic mock provider, on a fresh install: an
+ACCESS ticket ran `read_skill{slug: "locked-out-account"}` as its first call,
+then reset, commented and resolved, and the QA section reported
+`locked-out-account — READ by the run` / `when-to-escalate — NOT read`. Re-ran
+`npm run setup` on a populated database with an edited + disabled skill: 0 new
+skills, the edit and the retraction both preserved. Verified the upgrade path
+too — with pre-existing specialists whose allowlists predate `read_skill`, the
+catalogue is correctly withheld and the run proceeds as before. `/api/skills`
+exercised for create, validation failure, duplicate slug (409), rename (slug
+held), delete, and a REQUESTER 403. `read_skill` confirmed served over
+`getMcpTools()`, including the refusal on a disabled skill. The Skills page was
+rendered in a real browser at 1400×1000.
 
 ## Rejected
 
@@ -125,19 +207,31 @@ Closes the ROADMAP item "Egress allowlist for custom HTTP tools".
   a reviewer what a click will do. If it lands, it lands as HIGH with
   approval, not as an extension of a read-only reader.
 
+- **Paperclip's skill *scripts*.** Its skills ship executable helpers next to
+  `SKILL.md`. Servo skills are text on purpose: running admin-authored code
+  from the database would route around the tool policy layer entirely, which is
+  the one thing this product must not do. A procedure that needs to *act* names
+  a Servo tool, and that tool carries a risk level.
+- **Paperclip's `PAPERCLIP_*` env-var contract for skills.** It assumes agents
+  are external processes woken by heartbeats. Servo's agents run in-process
+  inside the resolver loop and get their context from the run, not the
+  environment — and a new mandatory env var is out of bounds anyway.
+
 ## Candidates for a future run
 
-- **Agent skills as versionable files** — `skills/<slug>/SKILL.md` with
-  frontmatter, seeded like `agents/*.md`, listed by name+description in the
-  resolver prompt and loaded on demand by a `read_skill` tool. This is the
-  natural companion to desk memory: memory is what the desk *did*, a skill is
-  what the desk *decided to always do*. Paperclip `skills/` and
-  `packages/skills-catalog` are the reference shape.
+- **Skill authoring from a resolved ticket** — "turn this run into a skill"
+  from the ticket view, pre-filling a `SKILL.md` draft from what the agent
+  actually did. The natural sequel now that skills exist, and it closes the
+  loop with desk memory: a precedent worth repeating becomes a procedure.
 - **Knowledge-gap mining on top of desk memory** — cluster the tickets where
   `search_tickets` found nothing into "write this runbook" suggestions.
-- **`search_web`** behind the same guard, once a provider that does not need
-  a new mandatory key can be configured from Settings (BYO search endpoint,
-  the way BYOK works today).
+- **Per-agent skill scoping** — today every enabled skill is catalogued for
+  every agent that holds `read_skill`. If a desk grows past a few dozen,
+  scoping skills to profiles (as `categories` scopes them to tickets) is the
+  next lever.
+- **`search_web`** behind the same egress guard, once a provider that does not
+  need a new mandatory key can be configured from Settings (BYO search
+  endpoint, the way BYOK works today).
 - **Attachment reading** — `read_attachment` so an agent can use the log file
   or screenshot a requester attached, reusing the text-extraction path.
 - **Egress audit** — record blocked outbound attempts on the run timeline so

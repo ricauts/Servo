@@ -19,7 +19,16 @@ export function triageUser(ticket: Ticket & { requester: User }): string {
   return `Ticket #${ticket.number}: ${ticket.title}\n\n${ticket.description}\n\nRequester: ${ticket.requester.name} <${ticket.requester.email}>`;
 }
 
-export function resolverSystem(toolPolicies: ToolPolicy[]): string {
+/**
+ * `skillSection` is the rendered "Desk skills" catalogue
+ * (src/lib/skill-format.ts). It is empty on an install with no skills, or when
+ * the agent's tool allowlist withholds read_skill — never advertise a
+ * catalogue the agent has no tool to open.
+ */
+export function resolverSystem(
+  toolPolicies: ToolPolicy[],
+  skillSection = "",
+): string {
   const toolLines = toolPolicies
     .map(
       (p) =>
@@ -48,7 +57,7 @@ Rules:
 - Risky tools may pause the run for human approval. If a tool_result reports that an action was
   rejected by a human, do NOT retry the same call — acknowledge the decision in a comment and
   escalate_to_human.
-- Keep every message short and focused on the ticket.`;
+- Keep every message short and focused on the ticket.${skillSection ? `\n\n${skillSection}` : ""}`;
 }
 
 export const draftSystem = `You are Servo Drafter, writing the reply a support engineer will send to the requester of an IT service-desk ticket.
@@ -88,7 +97,17 @@ in the resolved pile.
 Reply with ONLY a JSON object — no prose, no code fences:
 {"verdict": "PASS" | "FAIL", "notes": "..."}`;
 
-export function qaPrompt(run: AgentRun & { steps: AgentStep[] }, ticket: Ticket): string {
+/**
+ * `skillSection` is the rendered skill review block
+ * (src/lib/skill-format.ts): the desk skills that applied to this ticket and
+ * whether the run read each one. Empty when no skill applied, so QA's
+ * judgement on a skill-less desk is exactly what it was before.
+ */
+export function qaPrompt(
+  run: AgentRun & { steps: AgentStep[] },
+  ticket: Ticket,
+  skillSection = "",
+): string {
   const stepLines = run.steps
     .map((s) => {
       const label = s.toolName ? `${s.type} ${s.toolName}` : s.type;
@@ -106,6 +125,6 @@ Run summary: ${run.summary ?? "(none)"}
 
 Steps:
 ${stepLines || "(no steps recorded)"}
-
+${skillSection ? `\n${skillSection}\n` : ""}
 Reply with ONLY the JSON verdict.`;
 }

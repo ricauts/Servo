@@ -12,6 +12,9 @@ mock of itself. Have an opinion on priorities? Open an issue.
 - Real GitHub (repos, feature branches, PRs) and Azure read-only tools
 - Specialized agents as versionable `.md` personas with per-agent tool
   allowlists and per-agent API keys (BYOK pool with usage metering)
+- Desk skills as versionable `.md` procedures: the resolver sees a catalogue,
+  loads a body on demand with `read_skill`, and QA reviews the run against the
+  skills that applied
 - SSO via any OIDC IdP, domain allowlist, requester data isolation
 - Secrets encrypted at rest (AES-256-GCM); first-run wizard; clean installs
 - Desk memory: agents search past tickets and their recorded resolutions for

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BookOpen,
   Bot,
   LayoutDashboard,
   Inbox,
@@ -58,6 +59,7 @@ export default function SidebarNav({
       ? [
           { href: "/groups", label: "Groups", icon: Users2 } as NavItem,
           { href: "/agents", label: "Agents", icon: Bot } as NavItem,
+          { href: "/skills", label: "Skills", icon: BookOpen } as NavItem,
         ]
       : []),
     ...(showIntegrations

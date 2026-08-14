@@ -149,6 +149,13 @@ export const DEFAULT_TOOL_POLICIES: DefaultToolPolicy[] = [
     requiresApproval: false,
   },
   {
+    toolName: "read_skill",
+    description:
+      "Load one of this desk's agreed procedures (skills) in full before acting on a ticket it covers.",
+    riskLevel: "LOW",
+    requiresApproval: false,
+  },
+  {
     toolName: "escalate_to_human",
     description:
       "Hand the ticket to a human teammate when the main objective could not be completed.",

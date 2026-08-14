@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  BookOpen,
   Bot,
   Inbox,
   LayoutDashboard,
@@ -44,6 +45,7 @@ const PAGES = [
   { href: "/approvals", label: "Approvals", icon: ShieldCheck },
   { href: "/groups", label: "Groups", icon: Users2 },
   { href: "/agents", label: "Agents", icon: Bot },
+  { href: "/skills", label: "Skills", icon: BookOpen },
   { href: "/settings", label: "Settings", icon: Settings2 },
 ];
 

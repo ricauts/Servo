@@ -176,6 +176,29 @@ model Approval {
   decider     User?     @relation("decider", fields: [deciderId], references: [id])
 }
 
+// A desk skill: a procedure this desk has decided to always follow, written
+// as a Markdown document (YAML frontmatter: name, description, categories;
+// body = the procedure). Seeded from skills/<slug>/SKILL.md and editable from
+// the UI in the same format.
+//
+// Agent memory (search_tickets) is what the desk DID; a skill is what the desk
+// decided to ALWAYS DO. The resolver sees only name + description in its system
+// prompt and loads a body on demand with read_skill — the catalogue stays cheap
+// however many skills exist — and QA reviews the run against the skills that
+// applied to the ticket.
+model Skill {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String // the catalogue line the resolver chooses from; required
+  categories  String   @default("[]") // JSON: Category[] ([] = applies to every ticket)
+  body        String // the procedure, loaded by read_skill
+  markdown    String // raw SKILL.md source (frontmatter + body)
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 // A specialized resolver persona defined as a Markdown document (YAML
 // frontmatter: name, description, categories, tools; body = system prompt).
 // Seeded from agents/*.md and editable from the UI in the same format.

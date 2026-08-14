@@ -63,6 +63,16 @@ values like `TicketStatus`, `Priority`, `RiskLevel`, and `RunStatus`.
   same persona; the profile narrows the tool set (core `post_comment` /
   `resolve_ticket` always allowed) and appends its specialization to the
   resolver system prompt.
+- **Skill** — a procedure the desk has agreed to follow, stored as a Markdown
+  document (YAML frontmatter: `name`, `description`, `categories`; body = the
+  procedure). Seeded from `skills/<slug>/SKILL.md`, editable from `/skills` in
+  the same format. Progressive disclosure: `buildLoopContext` puts only the
+  catalogue (slug, scope, description) of the enabled skills into the resolver
+  system prompt — and only when the agent's allowlist kept `read_skill` — while
+  the body is loaded on demand by that tool. `runQaReview` tells QA which
+  applicable skills the run actually opened. The slug is immutable: it is the
+  handle `read_skill` takes and the key `syncSkills()` matches the bundled file
+  on.
 - **ToolPolicy** — per-tool risk level, enabled flag, and
   `requiresApproval` flag. Editable at runtime from Settings. Applies to
   built-in and custom tools alike.
